@@ -7,7 +7,7 @@ from backend.Utility import *
 
 
 def model_request(messages):
-    result = openai.ChatCompletion.create(model="gpt-4", messages=messages)
+    result = openai.ChatCompletion.create(model="gpt-4-1106-preview", messages=messages)
     for choice in result.choices:
         if "text" in choice:
             return choice.text
