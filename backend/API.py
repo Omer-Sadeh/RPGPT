@@ -17,7 +17,12 @@ def request_json(messages):
     result = LLM.generate(messages)
     if result["status"] == "success":
         try:
-            json_res = ast.literal_eval(result["result"])
+            raw_result = result["result"]
+            if raw_result.startswith("```python"):
+                raw_result = raw_result[10:]
+            if raw_result.endswith("```"):
+                raw_result = raw_result[:-3]
+            json_res = ast.literal_eval(raw_result)
             return json_res
         except:
             raise Exception("Error parsing JSON.\n" + result["result"]) 
