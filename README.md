@@ -40,6 +40,7 @@ Currently, the available themes are:
 - Sci-Fi
 - Wild-West
 - Superhero
+
 It is possible to add more themes by adding them in the `backend/Themes` file.
 The theme must be a Theme class object (defined in `backend/Classes.py`). A theme must recieve a name, and all other parameters are optional.
 The optional parameters are:
