@@ -1,4 +1,4 @@
-from backend.Classes import Theme
+from backend.Types.Theme import Theme
 
 Available_Themes = [
     Theme(
@@ -11,6 +11,10 @@ Available_Themes = [
             {"field": "profession", "value": ["Archer", "Ranger"], "categories": ["quiver"]},
             {"field": "profession", "value": ["Mage", "Druid", "Dragon-Rider"], "categories": ["spells"]},
             {"field": "profession", "value": ["Dragon-Rider"], "categories": ["dragon"]},
+        ],
+        extra_fields=[
+            {"field": "profession", "value": ["Barbarian"], "extra_field": "Tribe", "extra_field_value": "the player's tribe name"},
+            {"field": "profession", "value": ["Mage"], "extra_field": "School", "extra_field_value": "the player's Mages' School"},
         ]
     ),
     Theme(
@@ -32,6 +36,10 @@ Available_Themes = [
         skills=["SHOOTING", "HORSE RIDING", "SURVIVAL", "CHARISMA", "PERCEPTION", "LUCK"],
         extra_inventory_categories=[
             {"field": "profession", "value": "ALL", "categories": ["horse"]},
+        ],
+        extra_fields=[
+            {"field": "profession", "value": ["Indian"], "extra_field": "Tribe", "extra_field_value": "the player's tribe name"},
+            {"field": "profession", "value": ["Saloon Owner"], "extra_field": "Saloon_Name", "extra_field_value": "the player's Saloon name"}
         ]
     ),
     Theme(
@@ -43,7 +51,14 @@ Available_Themes = [
             {"field": "profession", "value": ["Superhero", "Villain", "Sidekick"], "categories": ["superpowers"]},
         ],
         extra_fields=[
-            {"field": "profession", "value": ["Superhero", "Villain"], "extra_field": "real_name", "extra_field_value": "freetext"}
+            {"field": "profession", "value": ["Superhero", "Villain"], "extra_field": "real_name", "extra_field_value": "the player's secret identity"},
         ]
     ),
 ]
+
+
+def get_theme(name: str) -> Theme:
+    for theme in Available_Themes:
+        if theme.name == name:
+            return theme
+    raise ValueError(f"Theme {name} not found!")
