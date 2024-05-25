@@ -31,6 +31,10 @@ class DataBase:
         logging.info(f"Saving game: {save_name}")
         logging.debug(f"Data: {data}")
 
+        if data.ver < self.get_save_data(username, save_name).ver:
+            logging.warning("Tried to commit earlier version. aborting commit.")
+            return
+
         self.conn.commit(username, save_name, data.to_dict())
         logging.info(f"Save completed: {save_name}")
 

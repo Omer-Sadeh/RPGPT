@@ -269,7 +269,7 @@ class Game:
 
         # Call the LLM and T2I GenAI with a testing prompt.
         # This is done in a non-blocking way to speed up the response.
-        test_llm_promise = start_promise(self.LLM.test())
+        test_llm_promise = start_promise(self.LLM.test)
         test_t2i_promise = start_promise(T2I.generate, "system_test")
         test_llm = await_promise(test_llm_promise)
         test_t2i = await_promise(test_t2i_promise)
@@ -509,13 +509,15 @@ class Game:
             self.DB.save_game_data(username, save_name, player_data)
 
             # Check if the result is already generated in the cache, and wait for it if it's in progress
-            while action in player_data.story["cache"] and player_data.story["cache"][action] == "in progress":
+            timeout = 0
+            while action in player_data.story["cache"] and player_data.story["cache"][action] == "in progress" and timeout < 10:
                 time.sleep(1)
+                timeout += 1
                 player_data = self.DB.get_save_data(username, save_name)
             logging.debug(f"Retrieved cache: {player_data.story['cache']}")
 
             # Generate the result of the action
-            if action in player_data.story["cache"]:  # If the result is already generated in the cache
+            if action in player_data.story["cache"] and player_data.story["cache"][action] != "in progress":  # If the result is already generated in the cache
                 result = player_data.story["cache"][action]
                 logging.debug(f"Retrieved result from cache: {result}")
             else:  # If the result is not generated in the cache (caused by an error while generating the cache)
@@ -526,7 +528,7 @@ class Game:
             logging.debug(f"Result: {result}")
 
             # Generate an image for the prompt if needed
-            if img_flag == 'True':
+            if img_flag:
                 img = T2I.generate(result["prompt"])
                 if img["status"] == "error":
                     raise Exception(img["reason"] + "\n" + "prompt: " + result["prompt"])
@@ -535,6 +537,7 @@ class Game:
 
             # Update the story and generate the cache for the next actions
             player_data.update_story(result, action)
+            player_data.advance_version()
             self.DB.save_game_data(username, save_name, player_data)
             start_promise(self.generate_story_cache, username, save_name)
             return result["action_result"]
@@ -612,6 +615,7 @@ class Game:
         # Update the player's data and save it
         player_data.action_points -= 1
         player_data.skills[skill] += 1
+        player_data.advance_version()
         logging.info(f"Spent action point on skill: {skill}")
         self.DB.save_game_data(username, save_name, player_data)
 

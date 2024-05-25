@@ -49,6 +49,7 @@ class SaveData:
             self.inventory = generated_inventory
             self.coins = 100
             self.death = False
+            self.ver = 0
 
     def set_from_dict(self, data: dict):
         self.story = data["story"]
@@ -64,6 +65,7 @@ class SaveData:
         self.inventory = Inventory(inventory=data["inventory"]) if isinstance(data["inventory"], dict) else data["inventory"]
         self.coins = data["coins"]
         self.death = data["death"]
+        self.ver = data["ver"]
 
     def __str__(self):
         return f"SaveData(theme={self.theme}, background={self.background}, level={self.level}, xp={self.xp}, " \
@@ -87,7 +89,8 @@ class SaveData:
             "skills": self.skills,
             "inventory": self.inventory.to_dict(),
             "coins": self.coins,
-            "death": self.death
+            "death": self.death,
+            "ver": self.ver
         }
 
     def __dict__(self):
@@ -110,6 +113,9 @@ class SaveData:
 
     def __ne__(self, other):
         return self.to_dict() != other.to_dict()
+
+    def advance_version(self):
+        self.ver += 1
 
     def init_story(self, goal: dict = None):
         skills = list(self.skills.keys())
