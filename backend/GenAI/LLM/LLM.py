@@ -79,7 +79,8 @@ class LLM:
         goal_generator_input = {
             "desired_goal": goal,
             "inventory": data.inventory,
-            "background": data.background
+            "background": data.background,
+            "memories": data.memories
         }
         logging.debug(f"Goal generator input: {goal_generator_input}")
         return self.model.generate_json(self.goal_system(data.theme), str(goal_generator_input))
@@ -87,7 +88,8 @@ class LLM:
     def generate_goals(self, data: SaveData) -> dict:
         goal_generator_input = {
             "inventory": data.inventory,
-            "background": data.background
+            "background": data.background,
+            "memories": data.memories
         }
         logging.debug(f"Goal generator input: {goal_generator_input}")
         return self.model.generate_json(self.goals_system(data.theme), str(goal_generator_input))
@@ -100,6 +102,23 @@ class LLM:
         logging.debug(f"Shop generator input: {shop_generator_input}")
         return self.model.generate_json(self.shop_system(data.theme, data.inventory.categories),
                                         str(shop_generator_input))
+
+    def check_abandon(self, data: SaveData) -> dict:
+        action_json = {
+            "history": self.write_history(data.story["history"]),
+            "current_scene": data.story["scene"]
+        }
+        logging.debug(f"Action JSON: {action_json}")
+        return self.model.generate_json(self.abandon_system(data.theme), str(action_json))
+
+    def close_adventure(self, data: SaveData) -> dict:
+        close_json = {
+            "background": data.background,
+            "inventory": data.inventory,
+            "story": self.write_history(data.story["history"])
+        }
+        logging.debug(f"Action JSON: {close_json}")
+        return self.model.generate_json(self.close_system(data.theme), str(close_json))
 
     # ---------------------------------------------- #
     # ------------ Prompt Constructors ------------- #
@@ -121,10 +140,11 @@ class LLM:
         {extra_fields_str} \
         backstory: The player's character backstory. Don't copy the details field from the input, write it yourself. \
         traits: an array of 3 traits the player has, like 'Smart', 'Sarcastic', 'Honest', 'Kind', 'Arrogant', etc. \
-        inventory: a dictionary of items the player initialy equips based on his backstory, in the json format i gave \
+        starting_location: the name of the player's starting location, fitting the {theme} theme. \
+        inventory: a dictionary of items the player initially equips based on his backstory, in the json format i gave \
         them in. \
         \
-        The backstory should be one or two short sentences desccribing the player's background. \
+        The backstory should be one or two short sentences describing the player's background. \
         It should be creative, unique, hinting a rich world setting, \
         and should be consistent with the player's background and the {theme} theme. \
         Keep the inventory minimal, no more than 2 items. \
@@ -148,9 +168,12 @@ class LLM:
             goal_end_field = "goal_status: 'win', 'lose' or 'in progress' according to the status towards the goal. "
             goal_field = f"The player's goal is: {goal}"
 
-        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
-        Guide the player through an exciting {theme} world filled with secrets to uncover, puzzles to solve and \
-        challenges to beat, fitting the {theme} theme. \
+        if len(data["memories"]) > 0:
+            background["memories"] = data["memories"][-10:]
+
+        return (f"You are the Game Master, narrating a text-based {theme} adventure game. \
+        Guide the player through an exciting {theme} world filled with secrets to uncover, puzzles to solve, exciting \
+        twists and challenges to beat, fitting the {theme} theme. \
         Adapt the story to the player's choices and ensure they experience a thrilling and engaging adventure, \
         {goal_desc}. \
         Make sure to keep the story's history so far in mind and provide a consistent and immersive experience. \
@@ -168,10 +191,12 @@ class LLM:
         \
         You will reply with a single json format containing the following fields: \
         scene: a short description of what the player sees only in the new scene unfolding according to the success of \
-        the player's action. \
+        the player's action and the starting location indicated in the background. \
         The scene has to be creative, imagination igniting, and consistent the world.\
         If the player's health reaches 0, describe the player's death. \
         Do not include the player's next choice in the scene. \
+        new_location: the name of the player's new current location, fitting the {theme} theme. \
+        Include the new_location field only when the player's action leads to a different location. \
         options: an array of 3 possible actions the player can take. If it involves using or receiving coins, state \
         the amount of coins, but do not spend it unless chosen! \
         IMPORTANT - Do not present options involving using items the player doesn't currently have in his inventory! \
@@ -194,10 +219,8 @@ class LLM:
         Keep the prompt in the {theme} theme and coherent with the story so far, and don't include the player in it! \
         \
         IMPORTANT: When the adventure's {goal_end} or the player's health reaches 0, do not include the options field! \
-        Instead of the options field, include a new_backstory field, with an updated player's backstory according to \
-        the result of the adventure (keep it short!). \
         \
-        " + self.model.sys_footer()
+        ") + self.model.sys_footer()
 
     def action_system(self, data: SaveData):
         theme = data.theme
@@ -240,7 +263,8 @@ class LLM:
         I will provide you in json format the following: \
         The player's desired goal, \
         The player's current inventory (items), \
-        The player's background. \
+        The player's background, \
+        The player's current milestones. \
         \
         You will reply with a single json format containing the following fields: \
         valid: a string value indicating weather the player's goal is valid or not: 'yes' or 'no'. \
@@ -256,7 +280,7 @@ class LLM:
         Your current role is to generate goals for the player to achieve. \
         \
         I will provide you in json format details about the player's character, \
-        including his backstory and current inventory (items). \
+        including his backstory, milestones and current inventory (items). \
         \
         You will reply with a single python list format containing 5 different goals in dict format, each containing \
         the following fields: \
@@ -273,19 +297,23 @@ class LLM:
         " + self.model.sys_footer()
 
     def shop_system(self, theme: Theme, inv_categories: list[str]):
-        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
+        return (f"You are the Game Master, narrating a text-based {theme} adventure game. \
         Your current role is to run a shop for the player to interact with. \
         \
         I will provide you in json format details about the player's character, \
         including his backstory and current inventory (items). \
         \
-        You will reply with a single json format containing the following fields: \
+        If the player's location doesn't allow for a shop to be available, such as a secluded area or a place where it \
+        makes no sense to have a shop, reply with a single json format containing the key 'problem' with the value \
+        'No Shop'. \
+        Else, you will reply with a single json format containing the following fields: \
         sold_items: a list of items the player can buy, in the json format i gave them in, only difference is that \
         each item is in the format item_name: (category, price). \
         buy_items: a list of items the player has in his inventory that the shopkeeper can buy, in the json format I \
         gave them in, only difference is that each item is in the format item_name: (category, price). \
         Item categories must be from: {inv_categories}. \
         Item prices must be in range [1, 5000]. \
+        shopkeeper_description: a short description of who the shopkeeper is, like 'a tavern keeper', 'a blacksmith', 'an old woman', etc. \
         shopkeeper_recommendation: shopkeeper's recommendation for the player, in the shopkeeper's words. \
         prompt: {image_prompt('''the shop's merchandise''')} \
         Keep the prompt in the {theme} theme, focus on the items and dont include the player in the prompt. \
@@ -295,5 +323,38 @@ class LLM:
         The shopkeeper's recommendation should consist of either pushing a sold item, or trying to buy an item from \
         the player. \
         Note, That the shopkeeper knows the player's character well, and is a snarky person. \
+        \
+        ") + self.model.sys_footer()
+
+    def abandon_system(self, theme: Theme):
+        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
+        Your current role is to check weather the player can quit the current running adventure. \
+        \
+        I will provide you in json format the following: \
+            The current adventure history, \
+            The current scene the player is in. \
+        \
+        You will reply with a single json format containing the following single field: \
+            possible: a string value indicating weather the player's leaving is permitted or not: 'yes' or 'no'. \
+            The player is permitted to leave if there's no danger to the player, and if the current situation allows \
+            freedom of movement away. \
+        \
+        " + self.model.sys_footer()
+
+    def close_system(self, theme: Theme):
+        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
+        Your current role is to summarize the adventure and close it. \
+        \
+        I will provide you in json format the following: \
+        The player's current background, \
+        The player's current inventory, \
+        and the full story. \
+        \
+        You will reply with a single json format containing the following fields: \
+        new_backstory: an updated player's backstory according to the result of the adventure (keep it short!). \
+        new_memories: an array of 2 of the player's central memories from the adventure, in the format: 'I defeated \
+        [character] at [place].', 'I found [item] in [place].', 'I saved [character] from [danger].', etc. \
+        IMPORTANT: a relevant memory is a major event, not every detail! \
+        IMPORTANT: keep the memories short and to the point! \
         \
         " + self.model.sys_footer()

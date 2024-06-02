@@ -1,5 +1,6 @@
-from frontend import CLI
+import time
 from backend.Endpoint import run_app
+from frontend import CLI
 from threading import Thread
 import argparse
 
@@ -15,4 +16,5 @@ if __name__ == "__main__":
     elif not args.cli:
         Thread(target=run_app, daemon=True).start()
     if not args.server:
+        time.sleep(1)
         CLI.start()

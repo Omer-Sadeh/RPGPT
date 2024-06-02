@@ -155,4 +155,7 @@ cython_debug/
 #  Uncomment the following line to ignore the whole .idea folder
 .idea/
 .DS_Store
-saves/
+backend/Database/auth_db.json
+backend/Database/conn/local_db/
+backend/Database/conn/FirebaseAuth.json
+backend/authDB.json

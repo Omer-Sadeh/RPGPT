@@ -1,14 +1,12 @@
-import ast
 import base64
 import os
 import io
 import requests
 from PIL import Image
 from colorama import init, Fore, Back, Style
-from dotenv import load_dotenv
 from simple_term_menu import TerminalMenu
+from getpass import getpass
 
-load_dotenv()
 init(autoreset=True)
 TOKEN = {
     "access_token": "",
@@ -31,22 +29,42 @@ def logout():
     env_file.close()
 
 
-def req(path, data=None) -> dict[str, any]:
-    url = 'http://127.0.0.1:5000{}'.format(path)
+def req(path, data=None, body=None) -> dict[str, any]:
+    url = 'http://127.0.0.1:8000{}/'.format(path)
     try:
+        # Build the headers
         headers = {"Authorization": "Bearer " + TOKEN["access_token"], "images": str(TOKEN["gen_img"])}
-        if data:
-            response = requests.post(url, json=data, headers=headers)
+
+        # Send the request
+        if data or body:
+            params = {}
+            if not body:
+                body = {}
+            if data:
+                for key, value in data.items():
+                    if isinstance(value, dict) or isinstance(value, list):
+                        body[key] = value
+                    else:
+                        params[key] = value
+            response = requests.post(url, params=params, json=body, headers=headers)
         else:
             response = requests.get(url, headers=headers)
+
+        # Process the response
         if response.status_code != 200:
-            if response.status_code == 401:
+            if 400 <= response.status_code < 500:
                 logout()
-                return {"status": "error", "reason": "Unauthorized. Please log in again."}
+                if response.status_code == 401:
+                    return {"status": "error", "reason": "Unauthorized. Please log in again."}
+                if "message" in response.json():
+                    return {"status": "error", "reason": response.json()["message"]}
+                else:
+                    return {"status": "error", "reason": "Failed communicating with server. " + response.reason}
             return {"status": "error",
-                    "reason": "Failed communicating with server. "
-                              + str(response.status_code) + ": " + ast.literal_eval(response.text)["msg"]}
-        return response.json()
+                    "reason": "Failed communicating with server. " + response.reason + " (" + str(response.status_code) + ")"}
+        return {"status": "success",
+                "result": response.json()}
+
     except requests.exceptions.ConnectionError:
         return {"status": "error", "reason": "Failed communicating with server. Connection refused."}
 
@@ -86,12 +104,15 @@ def choose_from_list(prompt, options, preview_func=None, preview_title=""):
     return choice
 
 
-def input_prompt(prompt, check_func=lambda _: True, error="Invalid input!"):
+def input_prompt(prompt, check_func=lambda _: True, error="Invalid input!", secret=False):
     print(Style.BRIGHT + prompt + Style.NORMAL, end="")
-    answer = input()
+    if secret:
+        answer = getpass("")
+    else:
+        answer = input()
     if not check_func(answer):
         invalid_choice(error)
-        return input_prompt(prompt, check_func, error)
+        return input_prompt(prompt, check_func, error, secret)
     return answer
 
 
@@ -216,13 +237,13 @@ def show_story_status(data, action_res_message):
     print()
 
 
-def show_general_status(data, shopkeeper_recommendation=""):
+def show_general_status(data, shopkeeper_recommendation="", shopkeeper_description=""):
     print_background(data["background"])
     print(Style.BRIGHT + Fore.YELLOW + "Coins: " + str(data["coins"]))
     print_inventory(data["inventory"])
     if shopkeeper_recommendation != "":
         print(
-            Style.BRIGHT + Fore.LIGHTCYAN_EX + "Shopkeeper:" + Style.NORMAL + Fore.WHITE + " \"" + shopkeeper_recommendation + "\"")
+            Style.BRIGHT + Fore.LIGHTCYAN_EX + shopkeeper_description + ":" + Style.NORMAL + Fore.WHITE + " \"" + shopkeeper_recommendation + "\"")
 
 
 def get_save_status(content):
@@ -436,21 +457,27 @@ def shop_sequence(save_name, gen_img):
             show_image(save_name)
             img = False
 
+        shopkeeper_description = shop["shopkeeper_description"]
         shopkeeper_recommendation = shop["shopkeeper_recommendation"]
         player_data = req("/fetch", {"save_name": save_name})
         if player_data["status"] == "error":
             print_error(player_data["reason"])
             exit_game()
         player_data = player_data["result"]
-        show_general_status(player_data, shopkeeper_recommendation)
+        show_general_status(player_data, shopkeeper_recommendation, shopkeeper_description)
         print()
+
+        if shopkeeper_description == "No shopkeeper available":
+            print("Press Enter to go back...", end="")
+            input()
+            break
 
         sold_items = shop["sold_items"]
         buy_items = shop["buy_items"]
 
         # Shopkeeper screen
         if screen == "shop":
-            choice = choose_from_list("Shopkeeper: \"What would you like to do?\"", ["Buy", "Sell", "Exit Shop"])
+            choice = choose_from_list(shopkeeper_description + ": \"What would you like to do?\"", ["Buy", "Sell", "Exit Shop"])
             if choice == 0:
                 screen = "buy"
                 continue
@@ -464,7 +491,7 @@ def shop_sequence(save_name, gen_img):
         # Buy screen
         elif screen == "buy":
             if len(sold_items) == 0:
-                print("Shopkeeper: \"I have nothing to sell you!\"")
+                print(shopkeeper_description + ": \"I have nothing to sell you!\"")
                 print("Press Enter to go back...", end="")
                 input()
                 screen = "shop"
@@ -478,7 +505,7 @@ def shop_sequence(save_name, gen_img):
                     return Style.BRIGHT + item + Style.DIM + " | " + sold_items[item][
                         0] + " | " + Style.BRIGHT + Fore.YELLOW + str(sold_items[item][1]) + " coins"
 
-                choice = choose_from_list("Shopkeeper: \"What would you like to buy?\"",
+                choice = choose_from_list(shopkeeper_description + ": \"What would you like to buy?\"",
                                           list(sold_items.keys()) + ["(*) Go Back"],
                                           preview_func=shop_item_description, preview_title="Item Description")
                 if choice == len(sold_items):
@@ -489,12 +516,12 @@ def shop_sequence(save_name, gen_img):
 
                 result = req("/buy", {"save_name": save_name, "item_name": list(sold_items.keys())[choice]})
                 if result["status"] == "error":
-                    print_error("Shopkeeper: \"" + result["reason"] + "\"")
+                    print_error(shopkeeper_description + ": \"" + result["reason"] + "\"")
                     continue
 
         elif screen == "sell":
             if len(buy_items) == 0:
-                print("Shopkeeper: \"I don't want to buy anything from you!\"")
+                print(shopkeeper_description + ": \"I don't want to buy anything from you!\"")
                 print("Press Enter to go back...", end="")
                 input()
                 screen = "shop"
@@ -508,7 +535,7 @@ def shop_sequence(save_name, gen_img):
                     return Style.BRIGHT + item + Style.DIM + " | " + buy_items[item][
                         0] + " | " + Style.BRIGHT + Fore.YELLOW + str(buy_items[item][1]) + " coins"
 
-                choice = choose_from_list("Shopkeeper: \"What would you like to sell?\"",
+                choice = choose_from_list(shopkeeper_description + ": \"What would you like to sell?\"",
                                           list(buy_items.keys()) + ["(*) Go Back"],
                                           preview_func=shop_item_description, preview_title="Item Description")
                 if choice == len(buy_items):
@@ -519,7 +546,7 @@ def shop_sequence(save_name, gen_img):
 
                 result = req("/sell", {"item_name": list(buy_items.keys())[choice], "save_name": save_name})
                 if result["status"] == "error":
-                    print_error("Shopkeeper: \"" + result["reason"] + "\"")
+                    print_error(shopkeeper_description + ": \"" + result["reason"] + "\"")
 
 
 def leveled_up_sequence(save_name, skills, points):
@@ -584,12 +611,21 @@ def game_step_sequence(save_name, game_data, action_res_message, gen_img=True):
         print_error(action_res_message)
 
     choice = choose_from_list("What Will You Do?", game_data["story"]["options"] + ["(*) Add new option",
+                                                                                    "(*) Abandon Story",
                                                                                     "(*) Save and Quit"],
                               preview_func=option_description, preview_title="Option Details")
-    if choice == len(game_data["story"]["options"]):
+    if choice == len(game_data["story"]["options"]):  # add new option
         add_option_sequence(save_name)
         return action_res_message
-    if choice == len(game_data["story"]["options"]) + 1:
+    if choice == len(game_data["story"]["options"]) + 1:  # abandon story
+        result = req("/end_story", {"save_name": save_name})
+        clear_screen()
+        if result["status"] == "error":
+            print_error(result["reason"])
+            return action_res_message
+        else:
+            return Style.BRIGHT + Fore.GREEN + "[ Success! ] " + Style.RESET_ALL
+    if choice == len(game_data["story"]["options"]) + 2:  # save and quit
         exit_game()
 
     proccess_print("Advancing story...")
@@ -692,27 +728,27 @@ def login_sequence():
     if choice == 0:
         while True:
             username = input_prompt("Username: ")
-            password = input_prompt("Password: ")
-            result = req("/login", {"username": username, "password": password})
+            password = input_prompt("Password: ", secret=True)
+            result = req("/login", body={"username": username, "password": password})
             if result["status"] == "error":
                 print_error(result["reason"])
                 continue
             TOKEN["access_token"] = result["result"]
             # save the token locally
             with open(".env", "a") as f:
-                f.write("\nACCESS_TOKEN=" + TOKEN["access_token"])
+                f.write("\nACCESS_TOKEN=" + str(TOKEN["access_token"]))
             break
         return result["result"]
     elif choice == 1:
         while True:
             username = input_prompt("Username: ")
-            password = input_prompt("Password: ")
-            result = req("/register", {"username": username, "password": password})
+            password = input_prompt("Password: ", secret=True)
+            result = req("/register", body={"username": username, "password": password})
             if result["status"] == "error":
                 print_error(result["reason"])
                 continue
             else:
-                result = req("/login", {"username": username, "password": password})
+                result = req("/login", body={"username": username, "password": password})
                 if result["status"] == "error":
                     print_error(result["reason"])
                     continue

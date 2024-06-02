@@ -4,5 +4,9 @@ Pillow
 python-dotenv
 requests
 simple-term-menu
-Flask
 tinydb
+uvicorn
+fastapi
+pydantic
+PyJWT
+bcrypt

@@ -2,9 +2,19 @@ import json
 
 
 class Inventory:
+    """
+    Inventory class representing a player's inventory.
+    """
+    # Initial categories for the inventory
     categories = ["weapon", "head", "body", "feet", "neck", "ring", "backpack"]
 
     def __init__(self, inventory: dict = None, extra_categories: list = None):
+        """
+        Initialize the inventory with the given items and categories.
+
+        :param inventory: A dictionary of an existing inventory - optional.
+        :param extra_categories: A list of extra categories to add to the inventory - optional.
+        """
         for category in self.categories:
             setattr(self, category, [])
 
@@ -60,23 +70,48 @@ class Inventory:
             self.add_items(other[category], category)
 
     def contains(self, item: str, category: str) -> bool:
+        """
+        Check if the inventory contains a specific item in a specific category.
+
+        :param item: The item to check for.
+        :param category: The category to check in.
+        :return: True if the item is in the category, False otherwise.
+        """
         if category not in self.categories:
             return False
         return item in getattr(self, category)
 
-    def add_item(self, item: str, category: str):
+    def add_item(self, item: str, category: str) -> None:
+        """
+        Add an item to the inventory.
+
+        :param item: The item to add.
+        :param category: The category to add the item to.
+        """
         if category not in self.categories:
             self.categories.append(category)
             setattr(self, category, [])
         getattr(self, category).append(item)
 
-    def add_items(self, items: list[str], category: str):
+    def add_items(self, items: list[str], category: str) -> None:
+        """
+        Add multiple items to the inventory.
+
+        :param items: A list of items to add.
+        :param category: The category to add the items to.
+        """
         if category not in self.categories:
             self.categories.append(category)
             setattr(self, category, [])
         setattr(self, category, self.__getattribute__(category) + items)
 
-    def remove_item(self, item: str, category: str):
+    def remove_item(self, item: str, category: str) -> None:
+        """
+        Remove an item from the inventory.
+
+        :param item: The item to remove.
+        :param category: The category to remove the item from.
+        """
         if category not in self.categories:
             raise ValueError(f"Category {category} not in inventory")
         if item not in getattr(self, category):

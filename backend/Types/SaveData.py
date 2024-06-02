@@ -19,14 +19,28 @@ def remove_init_num(input_string: str) -> str:
 
 
 class SaveData:
-    def __init__(self, data: dict = None, theme: str = None, background: dict = None, inventory: dict | Inventory = None):
+    """
+    Class to store the save data of a player.
+    Handles the story, shop, goals, memories, theme, background, level, experience points, action points, skills,
+    inventory, coins, and death status of the player.
+    Also, handles all the operations related to the save data.
+    """
+    def __init__(self, data: dict = None, theme: str = None, background: dict = None,
+                 inventory: dict | Inventory = None):
+        """
+        Initializes the SaveData object with the provided data.
+        If data is not provided, theme and background must be provided to create a new save.
+        """
         if data:  # create from existing data
             self.set_from_dict(data)
         else:  # create new save
             if not theme or not background:
                 raise ValueError("Theme and background must be provided if data is not provided.")
 
+            # get the Theme object from the theme name
             generated_theme = Themes.get_theme(theme)
+
+            # generate the data's inventory
             if not inventory:
                 generated_inventory = generated_theme.generate_empty_inventory(background)
             elif isinstance(inventory, dict):
@@ -36,9 +50,11 @@ class SaveData:
             else:
                 raise ValueError("Inventory must be a dictionary or an Inventory object.")
 
+            # initialize the SaveData object with the generated data
             self.story = {}
             self.shop = Shop()
             self.goals = []
+            self.memories = []
             self.theme = generated_theme
             self.background = background
             self.level = 1
@@ -52,9 +68,15 @@ class SaveData:
             self.ver = 0
 
     def set_from_dict(self, data: dict):
+        """
+        Sets the SaveData object from the provided dictionary.
+
+        :param data: the dictionary to set the SaveData object from
+        """
         self.story = data["story"]
         self.shop = Shop(data["shop"])
         self.goals = data["goals"]
+        self.memories = data["memories"]
         self.theme = Themes.get_theme(data["theme"]) if isinstance(data["theme"], str) else data["theme"]
         self.background = data["background"]
         self.level = data["level"]
@@ -67,19 +89,17 @@ class SaveData:
         self.death = data["death"]
         self.ver = data["ver"]
 
-    def __str__(self):
-        return f"SaveData(theme={self.theme}, background={self.background}, level={self.level}, xp={self.xp}, " \
-               f"xp_to_next_level={self.xp_to_next_level}, action_points={self.action_points}, skills={self.skills}, " \
-               f"inventory={self.inventory}, coins={self.coins}, death={self.death})"
-
-    def __repr__(self):
-        return self.__str__()
-
     def to_dict(self) -> dict:
+        """
+        Converts the SaveData object to a dictionary.
+
+        :return: the dictionary representation of the SaveData object
+        """
         return {
             "story": self.story,
             "shop": self.shop.to_dict(),
             "goals": self.goals,
+            "memories": self.memories,
             "theme": str(self.theme),
             "background": self.background,
             "level": self.level,
@@ -92,6 +112,14 @@ class SaveData:
             "death": self.death,
             "ver": self.ver
         }
+
+    def __str__(self):
+        return f"SaveData(theme={self.theme}, background={self.background}, level={self.level}, xp={self.xp}, " \
+               f"xp_to_next_level={self.xp_to_next_level}, action_points={self.action_points}, skills={self.skills}, " \
+               f"inventory={self.inventory}, coins={self.coins}, death={self.death})"
+
+    def __repr__(self):
+        return self.__str__()
 
     def __dict__(self):
         return self.to_dict()
@@ -115,9 +143,20 @@ class SaveData:
         return self.to_dict() != other.to_dict()
 
     def advance_version(self):
+        """
+        Advances the version of the save data.
+        Used for change synchronization, mainly for multi-threading in caching.
+        """
         self.ver += 1
 
     def init_story(self, goal: dict = None):
+        """
+        Initializes the story of the player.
+        Includes setting the history, scene, prompt, image, status, goal, health, options, rates, advantages, levels,
+        and experience points.
+
+        :param goal: the goal to be set for the player - Optional
+        """
         skills = list(self.skills.keys())
         self.story = {
             "history": [],
@@ -131,8 +170,7 @@ class SaveData:
             "rates": [1, 1, 1],
             "advantages": [skills[0], skills[1], skills[2]],
             "levels": [0, 0, 0],
-            "experience": [0, 0, 0],
-            "cache": {}
+            "experience": [0, 0, 0]
         }
         if goal:
             self.story["goal_status"] = "in progress"
@@ -142,6 +180,12 @@ class SaveData:
         self.goals = []
 
     def update_story(self, result: dict, action: str):
+        """
+        Updates the story of the player based on the result of an action.
+
+        :param result: the result of the action
+        :param action: the action taken by the player
+        """
         self.story["history"] += [action + ".", result["scene"]]
         action_index = self.story["options"].index(action)
         result_xp = 0 if result["action_result"] == "Failure" else self.story["experience"][action_index]
@@ -153,20 +197,19 @@ class SaveData:
         if "options" in result:
             self.story["options"] = [remove_init_num(option) for option in result["options"] if option != ""]
             self.story["rates"] = result["rates"]
-            self.story["advantages"] = [skill if skill in list(self.skills.keys()) else "INT" for skill in result["advantages"]]
+            self.story["advantages"] = [skill if skill in list(self.skills.keys()) else list(self.skills.keys())[0] for skill in result["advantages"]]
             self.story["levels"] = result["level"]
             self.story["experience"] = result["experience"]
         else:
             self.story["options"] = []
         if self.story["goal"]:
             self.story["goal_status"] = result["goal_status"]
-        if "new_backstory" in result:
-            self.story["new_backstory"] = result["new_backstory"]
-        self.story["cache"] = {}
+        if "new_location" in result:
+            self.background["location"] = result["new_location"]
         self.add_xp(result_xp)
         self.story["status"] = result["action_result"]
 
-    def add_xp(self, xp: int) -> None:
+    def add_xp(self, xp: int):
         """
         Updates the experience points of the player based on the added experience points.
         Includes updating the level, experience points, and action points.
@@ -183,5 +226,10 @@ class SaveData:
 
         self.xp = current_xp
 
-    def goals_list(self):
+    def goals_list(self) -> list[str]:
+        """
+        Returns the list of goals of the player.
+
+        :return: the list of goals of the player
+        """
         return [goal["goal"] for goal in self.goals]

@@ -63,31 +63,37 @@ class Game:
         """
         logging.info("Generating story cache...")
 
-        # Load the player's data and initiate the promises for each action's result
-        player_data = self.DB.get_save_data(username, save_name)
-        choices_promises = [start_promise(self.generate_action_result, username, save_name, choice) for choice in player_data.story["options"]]
+        try:
+            # Load the player's data
+            player_data = self.DB.get_save_data(username, save_name)
 
-        # Initialize the cache with "in progress" for each action
-        for action in player_data.story["options"]:
-            player_data.story["cache"][action] = "in progress"
-        self.DB.save_game_data(username, save_name, player_data)
+            # Initialize the cache with "in progress" for each action
+            self.DB.delete_all_cache(username, save_name)
+            for action in player_data.story["options"]:
+                self.DB.cache(username, save_name, action, "in progress")
+        except Exception as e:
+            logging.exception(f"Error initializing story cache:")
+            return
+
+        # Generate the results of each action asynchronously
+        choices_promises = [start_promise(self.generate_action_result, username, save_name, choice)
+                            for choice in player_data.story["options"]]
 
         # Generate the results of each action and update the cache
         for idx, action in enumerate(player_data.story["options"]):
             try:
                 res = await_promise(choices_promises[idx])
                 if res["status"] == "error":
-                    player_data.story["cache"].pop(action, None)
+                    self.DB.delete_cache(username, save_name, action)
                     logging.error(f"Error generating cache for option {action}: {res['reason']}")
                 else:
-                    player_data.story["cache"][action] = res["result"]
+                    self.DB.cache(username, save_name, action, res["result"])
                     logging.debug(f"Generated cache for option {action}: {res['result']}")
             except Exception as e:
-                player_data.story["cache"].pop(action, None)
+                self.DB.delete_cache(username, save_name, action)
                 logging.exception(f"Error generating story cache:")
-            self.DB.save_game_data(username, save_name, player_data)
 
-    def generate_no_story_cache(self, username: str, save_name: str, img_flag: bool) -> None:
+    def generate_no_story_data(self, username: str, save_name: str, img_flag: bool) -> None:
         """
         Generate the shop and goals for the player when the story is not running.
 
@@ -105,7 +111,7 @@ class Game:
 
         try:
             # Generate the shop and goals for the player
-            shop_promise = start_promise(self.generate_shop, player_data, img_flag)
+            shop_promise = start_promise(self.generate_shop, username, save_name, player_data, img_flag)
             goals_promise = start_promise(self.generate_goals, player_data)
 
             # Process the results and save the player's data
@@ -134,10 +140,12 @@ class Game:
             logging.exception(f"Error generating shop and goals caches:")
 
     @error_wrapper
-    def generate_shop(self, data: SaveData, img_flag: bool = False) -> dict:
+    def generate_shop(self, username: str, save_name: str, data: SaveData, img_flag: bool = False) -> dict:
         """
         Generate the shop for the player based on the player's data.
 
+        :param username: The username of the player.
+        :param save_name: The name of the save.
         :param data: The player's data.
         :param img_flag: Whether to generate an image for the shop.
         :return: The generated shop.
@@ -158,7 +166,7 @@ class Game:
                     logging.error(f"Shop generation image error: {img['reason']}")
                     raise Exception(img["reason"])
                 else:
-                    self.DB.save_image(img["result"])
+                    self.DB.save_image(username, save_name, img["result"])
                 logging.info("Generated shop image.")
             logging.info("Generated shop.")
             return result
@@ -227,28 +235,22 @@ class Game:
         if player_data.story != {}:
             logging.info("Open story found. resetting status and cache...")
             player_data.story["status"] = ""
-            cache_copy = player_data.story["cache"].copy()
-            for action in player_data.story["cache"]:
-                if player_data.story["cache"][action] == "in progress":
-                    cache_copy.pop(action, None)
-            player_data.story["cache"] = cache_copy
-            if player_data.story["cache"] == {}:
-                start_promise(self.generate_story_cache, username, save_name)
+            start_promise(self.generate_story_cache, username, save_name)
         else:
-            if player_data.shop.status != "open":
+            if player_data.shop.status == "generating":
                 player_data.shop.close()
-                logging.info("Resetting shop cache.")
+                logging.info("Resetting shop.")
             if player_data["goals"] == "generating":
                 player_data["goals"] = []
-                logging.info("Resetting goals cache.")
+                logging.info("Resetting goals.")
             logging.info("No open story found.")
+
+        self.DB.save_game_data(username, save_name, player_data)
 
         # Generate the shop and goals caches
         if player_data.story == {} and player_data.shop.status == "closed" and player_data["goals"] == []:
             logging.info("No shop and goals caches found. Generating shop and goals caches...")
-            start_promise(self.generate_no_story_cache, username, save_name, img_flag)
-
-        self.DB.save_game_data(username, save_name, player_data)
+            start_promise(self.generate_no_story_data, username, save_name, img_flag)
 
         return player_data
 
@@ -294,6 +296,7 @@ class Game:
         :param username: The username of the player.
         :return: The list of all the saves.
         """
+        self.DB.sync_conns(username)
         return self.DB.saves_list(username)
 
     @APIEndpoint
@@ -343,7 +346,7 @@ class Game:
         for field in background:
             decision = SNS.llm_input(background[field])
             if not decision:
-                raise CustomException("Invalid background input: " + field + ": " + background[field] + ", " + decision.reason)
+                raise CustomException("Invalid background input: " + field + ": " + str(background[field]) + ", " + decision.reason)
         try:
             theme = get_theme(theme_name)
         except ValueError:
@@ -363,6 +366,7 @@ class Game:
         background["name"] = result["name"]
         background["backstory"] = result["backstory"]
         background["traits"] = result["traits"]
+        background["location"] = result["starting_location"]
         for extra_field in theme.get_generated_extra_fields(background):
             field_name = extra_field["extra_field"]
             background[field_name] = result[field_name]
@@ -390,6 +394,7 @@ class Game:
         :param save_name: The name of the save.
         """
         self.DB.delete_save(username, process_save_name(save_name))
+        self.DB.delete_all_cache(username, save_name)
 
     @APIEndpoint
     def get_goals(self, username: str, save_name: str, regen: bool = False) -> list:
@@ -509,16 +514,17 @@ class Game:
             self.DB.save_game_data(username, save_name, player_data)
 
             # Check if the result is already generated in the cache, and wait for it if it's in progress
-            timeout = 0
-            while action in player_data.story["cache"] and player_data.story["cache"][action] == "in progress" and timeout < 10:
-                time.sleep(1)
-                timeout += 1
-                player_data = self.DB.get_save_data(username, save_name)
-            logging.debug(f"Retrieved cache: {player_data.story['cache']}")
+            while True:
+                cache_data = self.DB.get_cache(username, save_name, action)
+                if cache_data and cache_data == "in progress":
+                    time.sleep(1)
+                else:
+                    break
+            logging.debug(f"Retrieved cache: {cache_data}")
 
             # Generate the result of the action
-            if action in player_data.story["cache"] and player_data.story["cache"][action] != "in progress":  # If the result is already generated in the cache
-                result = player_data.story["cache"][action]
+            if cache_data and cache_data != "in progress":  # If the result is already generated in the cache
+                result = cache_data
                 logging.debug(f"Retrieved result from cache: {result}")
             else:  # If the result is not generated in the cache (caused by an error while generating the cache)
                 result = self.generate_action_result(username, save_name, action)
@@ -587,9 +593,10 @@ class Game:
         # Add the new action to the story data and save it
         player_data.story["options"].append(new_action)
         player_data.story["rates"].append(result["rate"])
-        player_data.story["advantages"].append(result["advantage"])
-        player_data.story["levels"].append(result["level"])
-        player_data.story["experience"].append(result["experience"])
+        player_data.story["advantages"].append(result["advantage"] if result["advantage"] in player_data.skills.keys()
+                                               else list(player_data.skills.keys())[0])
+        player_data.story["levels"].append(result["level"] if isinstance(result["level"], int) else 0)
+        player_data.story["experience"].append(result["experience"] if isinstance(result["experience"], int) else 0)
         self.DB.save_game_data(username, save_name, player_data)
         return "Created!"
 
@@ -639,9 +646,9 @@ class Game:
             continue
 
         # Generate the shop if it is not already generated
-        if player_data.shop.status != "open":
+        if player_data.shop.status == "closed":
             logging.info("No shop in cache.")
-            result = self.generate_shop(player_data, img_flag)
+            result = self.generate_shop(username, save_name, player_data, img_flag)
             if result["status"] == "error":
                 logging.error(f"Shop generation error: {result['reason']}")
                 raise Exception(result["reason"])
@@ -650,6 +657,9 @@ class Game:
             logging.info("Generated shop.")
             logging.debug(f"Generated shop: {result}")
             self.DB.save_game_data(username, save_name, player_data)
+        elif player_data.shop.status == "unavailable":
+            logging.error("Shop unavailable.")
+            raise CustomException("Shop unavailable at player's location.")
         else:
             result = player_data.shop.to_dict()
 
@@ -721,13 +731,37 @@ class Game:
         """
         # Load the player's data
         content = self.DB.get_save_data(username, save_name)
+        if content.story == {}:
+            raise CustomException("No story to end!")
 
-        # Update the player's backstory to the new backstory
-        if "new_backstory" in content.story:
+        if len(content.story["options"]) != 0 and (
+                "goal_status" not in content.story or content.story["goal_status"] == "in progress"):
+            # If the story is not finished,
+            # Call the LLM model to generate the result of abandoning
+            result = self.LLM.check_abandon(content)
+            if result["status"] == "error":
+                raise Exception(result["reason"])
+
+            # Process the result and proceed
+            result = result["result"]
+            if result["possible"] == "no":
+                raise CustomException("Not possible to abandon at current situation!")
+        else:  # If the story is finished
+            result = self.LLM.close_adventure(content)
+            if result["status"] == "error":
+                raise Exception(result["reason"])
+            result = result["result"]
+
+            # Update the player's backstory to the new backstory
             logging.info("Updating backstory...")
             logging.debug(f"Old backstory: {content.background['backstory']}")
-            logging.debug(f"New backstory: {content.story['new_backstory']}")
-            content.background["backstory"] = content.story["new_backstory"]
+            logging.debug(f"New backstory: {result['new_backstory']}")
+            content.background["backstory"] = result['new_backstory']
+
+            # update the player's memories
+            logging.info("Updating memories...")
+            logging.debug(f"New memories: {result['new_memories']}")
+            content.memories += result['new_memories']
 
         # Check if the player has died and update the player's death status
         if content.story["health"] == 0:
@@ -747,7 +781,7 @@ class Game:
         content.story = {}
         self.DB.save_game_data(username, save_name, content)
         logging.info("Game ended.")
-        start_promise(self.generate_no_story_cache, username, save_name, img_flag)
+        start_promise(self.generate_no_story_data, username, save_name, img_flag)
 
     @APIEndpoint
     def get_image(self, username: str, save_name: str) -> str:

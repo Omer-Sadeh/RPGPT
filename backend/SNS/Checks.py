@@ -16,7 +16,7 @@ class LengthCheck(Check):
         :return: True if the request is within the max length, False otherwise.
         """
         num_words = len(req.split())
-        if num_words > self.max_length or num_words < 1:
+        if num_words > self.max_length:
             logging.error(f"Invalid request, too many words: {num_words}")
             return False
         return True

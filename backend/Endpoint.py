@@ -1,371 +1,143 @@
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
-from flask import Flask, request
-from flask_sqlalchemy import SQLAlchemy
-from flask_bcrypt import Bcrypt
+import logging
+from typing import Union, Annotated
+import uvicorn
+from fastapi import FastAPI, Header, Request, Body, Depends
+from fastapi.responses import JSONResponse
 from backend.Game.Game import Game
-from backend.Utility import build_error_response, build_success_response
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt, \
-    set_access_cookies
+from backend.Utility import LOGGING_CONFIG, CustomException
+from backend.Auth import JWTBearer, UserSchema, AuthDatabase
 
 
-# ----------------------------------------------------- #
-# ---------------------- App Setup -------------------- #
-# ----------------------------------------------------- #
-
-
-def check_inputs(input_data, required_fields):
-    for f_name, f_type in required_fields.items():
-        if f_name not in input_data:
-            return build_error_response(f"{f_name} not provided.")
-        if type(input_data[f_name]) is not f_type:
-            return build_error_response(f"{f_name} must be a {f_type}, got {type(input_data[f_name])} instead.")
-    return None
-
-
-app = Flask(__name__)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-app.config['SECRET_KEY'] = 'your_strong_secret_key'
-app.config["JWT_SECRET_KEY"] = 'your_jwt_secret_key'
-app.config['JWT_TOKEN_LOCATION'] = ['headers']
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
-
-db = SQLAlchemy(app)
-bcrypt = Bcrypt()
-jwt = JWTManager(app)
-
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True)
-    email = db.Column(db.String(70), unique=True)
-    password = db.Column(db.String(80))
-
-
-@app.after_request
-def refresh_expiring_jwts(response):
-    try:
-        exp_timestamp = get_jwt()["exp"]
-        now = datetime.now(timezone.utc)
-        target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-        if target_timestamp > exp_timestamp:
-            access_token = create_access_token(identity=get_jwt_identity())
-            set_access_cookies(response, access_token)
-        return response
-    except (RuntimeError, KeyError):
-        return response
-
-
-@app.route('/login', methods=['POST'])
-def login():
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "username": str,
-        "password": str
-    })
-    if error:
-        return error
-
-    username = input_data['username']
-    password = input_data['password']
-
-    user = User.query.filter_by(username=username).first()
-
-    if user and bcrypt.check_password_hash(user.password, password):
-        access_token = create_access_token(identity=user.id)
-        return build_success_response(access_token)
-    else:
-        return build_error_response("Invalid username or password")
-
-
-@app.route('/register', methods=['POST'])
-def register():
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "username": str,
-        "password": str
-    })
-    if error:
-        return error
-
-    username = input_data['username']
-    password = input_data['password']
-
-    if len(username.split()) > 1:
-        return build_error_response("Username must not contain spaces.")
-    if len(password) < 8:
-        return build_error_response("Password must be at least 8 characters long.")
-    if not any(char.isdigit() for char in password):
-        return build_error_response("Password must contain at least one digit.")
-    if not any(char.isupper() for char in password):
-        return build_error_response("Password must contain at least one uppercase letter.")
-    if not any(char.islower() for char in password):
-        return build_error_response("Password must contain at least one lowercase letter.")
-    if not any(char in "!@#$%^&*()-+" for char in password):
-        return build_error_response("Password must contain at least one special character.")
-
-    user = User.query.filter_by(username=username).first()
-
-    if user:
-        return build_error_response("Username already exists!")
-
-    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    new_user = User(username=username, password=hashed_password)
-    db.session.add(new_user)
-    db.session.commit()
-
-    return build_success_response("User created successfully!")
-
-
-def run_app():
-    with app.app_context():
-        db.create_all()
-        app.run()
-
-
-# ----------------------------------------------------- #
-# ---------------------- Endpoint --------------------- #
-# ----------------------------------------------------- #
-
+app = FastAPI(title="GenGame")
+AuthDB = AuthDatabase()
 API = Game()
 
 
-@app.route('/startup', methods=['GET'])
+def run_app():
+    uvicorn.run(app, log_level="critical", log_config=LOGGING_CONFIG)
+
+
+@app.exception_handler(Exception)
+async def custom_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, CustomException):
+        logging.error(f"Custom exception found in: {request.url}: {str(exc)}")
+        return JSONResponse(
+            status_code=418,
+            content={"message": str(exc)},
+        )
+    logging.exception(f"exception found in: {request.url}:")
+    return JSONResponse(
+        status_code=500,
+        content={"message": "The server encountered an error while processing the request."},
+    )
+
+
+@app.post("/login/", tags=["user"])
+async def login(user: UserSchema = Body(...)):
+    return AuthDB.authenticate_user(user)
+
+
+@app.post("/register/", tags=["user"])
+async def create_user(user: UserSchema = Body(...)):
+    return AuthDB.register_user(user)
+
+
+@app.get('/startup/')
 def startup():
     return API.system_startup()
 
 
-@app.route('/saves_list', methods=['GET'])
-@jwt_required()
-def saves():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
+@app.get('/saves_list/', dependencies=[Depends(JWTBearer())])
+def saves(authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
     return API.get_saves_list(username)
 
 
-@app.route('/themes', methods=['GET'])
+@app.get('/themes/')
 def themes():
     return API.get_available_themes()
 
 
-@app.route('/load', methods=['POST'], endpoint='load')
-@jwt_required()
-def load():
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    if error:
-        return error
-    return API.load_save(username, input_data["save_name"], request.headers['images'] == 'True')
+@app.post('/load/', dependencies=[Depends(JWTBearer())])
+def load(save_name: str, images: Annotated[str | None, Header()], authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.load_save(username, save_name, images == "True")
 
 
-@app.route('/fetch', methods=['POST'], endpoint='fetch')
-@jwt_required()
-def fetch():
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    if error:
-        return error
-    return API.fetch_save(username, input_data["save_name"])
+@app.post('/fetch/', dependencies=[Depends(JWTBearer())])
+def fetch(save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.fetch_save(username, save_name)
 
 
-@app.route('/new_save', methods=['POST'], endpoint='new_save')
-@jwt_required()
-def new_save():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "theme": str,
-        "background": dict
-    })
-
-    if error:
-        return error
-    return API.new_save(username, input_data["theme"], input_data["background"])
+@app.post('/new_save/', dependencies=[Depends(JWTBearer())])
+def new_save(theme: str, body: dict, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.new_save(username, theme, body['background'])
 
 
-@app.route('/delete', methods=['POST'], endpoint='delete')
-@jwt_required()
-def delete():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.delete_save(username, input_data["save_name"])
+@app.post('/delete/', dependencies=[Depends(JWTBearer())])
+def delete(save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.delete_save(username, save_name)
 
 
-@app.route('/goals', methods=['POST'], endpoint='goals')
-@jwt_required()
-def goals():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-    input_data = request.get_json()
-
-    error = check_inputs(input_data, {
-        "regen": bool,
-        "save_name": str
-    })
-
-    if error:
-        return error
-
-    return API.get_goals(username, input_data["save_name"], input_data["regen"])
+@app.post('/goals/', dependencies=[Depends(JWTBearer())])
+def goals(save_name: str, regen: bool, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.get_goals(username, save_name, regen)
 
 
-@app.route('/new_story', methods=['POST'], endpoint='new_story')
-@jwt_required()
-def new_story():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.new_story(username, input_data["save_name"], input_data["goal"] if "goal" in input_data else None)
+@app.post('/new_story', dependencies=[Depends(JWTBearer())])
+def new_story(save_name: str, goal: Union[str, None], authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.new_story(username, save_name, goal)
 
 
-@app.route('/advance', methods=['POST'], endpoint='advance')
-@jwt_required()
-def advance():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "action": str,
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.advance_story(username, input_data["save_name"], input_data["action"], request.headers['images'] == 'True')
+@app.post('/advance/', dependencies=[Depends(JWTBearer())])
+def advance(action: str, save_name: str, images: Annotated[str | None, Header()], authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.advance_story(username, save_name, action, images == "True")
 
 
-@app.route('/new_option', methods=['POST'], endpoint='new_option')
-@jwt_required()
-def new_option():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "new_action": str,
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.create_new_option(username, input_data["save_name"], input_data["new_action"])
+@app.post('/new_option/', dependencies=[Depends(JWTBearer())])
+def new_option(new_action: str, save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.create_new_option(username, save_name, new_action)
 
 
-@app.route('/spend', methods=['POST'], endpoint='spend')
-@jwt_required()
-def spend():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "skill": str,
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.spend_action_point(username, input_data["save_name"], input_data["skill"])
+@app.post('/spend/', dependencies=[Depends(JWTBearer())])
+def spend(skill: str, save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.spend_action_point(username, save_name, skill)
 
 
-@app.route('/shop', methods=['POST'], endpoint='shop')
-@jwt_required()
-def shop():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.get_shop(username, input_data["save_name"], request.headers['images'] == 'True')
+@app.post('/shop/', dependencies=[Depends(JWTBearer())])
+def shop(save_name: str, images: Annotated[str | None, Header()], authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.get_shop(username, save_name, images == "True")
 
 
-@app.route('/buy', methods=['POST'], endpoint='buy')
-@jwt_required()
-def buy():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "item_name": str,
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.buy_item(username, input_data["save_name"], input_data["item_name"])
+@app.post('/buy/', dependencies=[Depends(JWTBearer())])
+def buy(item_name: str, save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.buy_item(username, save_name, item_name)
 
 
-@app.route('/sell', methods=['POST'], endpoint='sell')
-@jwt_required()
-def sell():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "item_name": str,
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.sell_item(username, input_data["save_name"], input_data["item_name"])
+@app.post('/sell/', dependencies=[Depends(JWTBearer())])
+def sell(item_name: str, save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.sell_item(username, save_name, item_name)
 
 
-@app.route('/end_story', methods=['POST'], endpoint='end_story')
-@jwt_required()
-def end():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
-
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.end_game(username, input_data["save_name"], request.headers['images'] == 'True')
+@app.post('/end_story/', dependencies=[Depends(JWTBearer())])
+def end(save_name: str, images: Annotated[str | None, Header()], authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.end_game(username, save_name, images == "True")
 
 
-@app.route('/image', methods=['POST'], endpoint='image')
-@jwt_required()
-def image():
-    username = User.query.filter_by(id=get_jwt_identity()).first().username
+@app.post('/image/', dependencies=[Depends(JWTBearer())])
+def image(save_name: str, authorization: str = Header(None)):
+    username = AuthDB.decode_token(authorization.split(' ')[1])
+    return API.get_image(username, save_name)
 
-    input_data = request.get_json()
-    error = check_inputs(input_data, {
-        "save_name": str
-    })
-
-    if error:
-        return error
-    return API.get_image(username, input_data["save_name"])
-
-
-if __name__ == '__main__':
-    run_app()

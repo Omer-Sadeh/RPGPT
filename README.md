@@ -6,10 +6,17 @@ RPGPT is a game that generates a text-based adventure for a user-created charact
 The game is based on the [GPT-4](https://openai.com/) language model, and uses a [HuggingFace](https://huggingface.co/) space for the text-to-image feature.
 The backend is hosted on a Flask server, and the frontend is a CLI interface.
 This project was created for fun and as a learning experience, and is open for contributions and improvements.
+Used technologies in the project:
+- FastAPI
+- OpenAI API
+- HuggingFace API
+- Firebase Database
 
 ## Installation
 
-First, set your openai and huggingface api keys in the `./envfile` file. (You can get an openai api key [here](https://platform.openai.com/), and a huggingface api key [here](https://huggingface.co/), huggingface key is optional, and required only for the experimental T2I feature.)
+First, set your openai and huggingface api keys and the auth secret you want to use in the `./envfile` file.
+(You can get an openai api key [here](https://platform.openai.com/) and a huggingface api key [here](https://huggingface.co/)
+(huggingface key is optional, and required only for the experimental T2I feature.)).
 Then:
 
 ```bash
@@ -17,11 +24,9 @@ cp envfile .env
 pip install -r requirements.txt
 ```
 
-If you want to use the Firebase Database to save and load characters,
+If you want to use the Firebase Database for data backup,
 you will need to set up a Firebase project and download the service account key.
 Then, save the service account key in a `./backend/Database/conn/firebaseAuth.json` file.
-Else, the game will use a local database to save and load characters
-(not recommended for production as it is not stable).
 
 ## Usage
 
