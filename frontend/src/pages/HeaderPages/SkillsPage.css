@@ -1,0 +1,30 @@
+.SkillsPage {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    width: 100%;
+    max-width: 300px;
+}
+
+.SkillsTitle {
+    font-size: 3.5vmin;
+    text-decoration: underline;
+}
+
+.xpSubTitle {
+    font-size: 1.5vmin;
+    color: rgba(240, 248, 255, 0.77);
+    margin-top: 2vmin;
+}
+
+.xpbar {
+    width: 90%;
+    margin-bottom: 2vmin;
+}
+
+.ActionPoints {
+    font-size: 2vmin;
+    color: goldenrod;
+    margin-top: 2vmin;
+}

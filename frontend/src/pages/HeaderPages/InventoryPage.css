@@ -1,0 +1,19 @@
+.InventoryPage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: start;
+    width: 100%;
+    min-height: 40vh;
+}
+
+.InventoryTitle {
+    font-size: 3.5vmin;
+    text-decoration: underline;
+}
+
+.InventoryCoins {
+    font-size: 2vmin;
+    color: goldenrod;
+    margin-top: 0.5vmin;
+}

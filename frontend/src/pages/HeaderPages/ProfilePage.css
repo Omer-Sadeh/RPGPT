@@ -1,0 +1,33 @@
+.ProfilePage {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    width: 100%;
+}
+
+.CharacterName {
+    font-size: 3.5vmin;
+    font-weight: bold;
+    color: aliceblue;
+    text-decoration: underline;
+}
+
+.CharacterBackstory {
+    font-size: 2vmin;
+    color: rgba(240, 248, 255, 0.75);
+    margin: 1vmin;
+    text-align: left;
+    padding-bottom: 1vmin;
+    border-bottom: 1px solid aliceblue;
+}
+
+.CharacterImg {
+    width: 60%;
+    margin: 1vmin;
+    border-radius: 40% 40% 5% 5%;
+    border: 1px solid aliceblue;
+
+    pointer-events: none;
+    -webkit-user-drag: none;
+}

@@ -62,7 +62,17 @@ class LLM:
             "coins": data.coins
         }
         logging.debug(f"Action JSON: {action_json}")
-        return self.model.generate_json(self.storyteller_system(data), str(action_json))
+
+        result = self.model.generate_json(self.storyteller_system(data), str(action_json))
+        if result["status"] == "success" and not isinstance(result["result"]["options"][0], str):
+            logging.debug(f"BAD RESULT! Action result: {result['result']}")
+            logging.debug(f"Trying again...")
+            result = self.model.generate_json(self.storyteller_system(data), str(action_json))
+            if result["status"] == "success" and not isinstance(result["result"]["options"][0], str):
+                logging.debug(f"BAD RESULT AGAIN! Action result: {result['result']}")
+                logging.debug(f"Failed to generate a valid result!")
+                return {"status": "error", "reason": "Failed to generate a valid result!"}
+        return result
 
     def generate_custom_action(self, data: SaveData, new_action: str) -> dict:
         action_json = {
@@ -142,7 +152,8 @@ class LLM:
         traits: an array of 3 traits the player has, like 'Smart', 'Sarcastic', 'Honest', 'Kind', 'Arrogant', etc. \
         starting_location: the name of the player's starting location, fitting the {theme} theme. \
         inventory: a dictionary of items the player initially equips based on his backstory, in the json format i gave \
-        them in. \
+        them in. Each item must be a single string. \
+        prompt: {image_prompt('''this character''')} Be sure to include the fact that the character's gender is {background['gender']}. \
         \
         The backstory should be one or two short sentences describing the player's background. \
         It should be creative, unique, hinting a rich world setting, \
@@ -284,9 +295,9 @@ class LLM:
         \
         You will reply with a single python list format containing 5 different goals in dict format, each containing \
         the following fields: \
+        title: the goal's title. \
         goal: a short description of what the player needs to achieve, being clear and direct, so it's easy to tell if \
-        the player achieved them or not, \
-        and consistent with the player's backstory, inventory and the {theme} theme. \
+        the player achieved them or not, and consistent with the player's backstory, inventory and the {theme} theme. \
         xp_reward: the amount of experience points the player will receive if he achieves the goal, in range [0, 1000].\
         gold_reward: add this field only if the goal completion means the player receives coins from the goal \
         requester, and set it to the amount of coins the player will receive, in range [0, 500]. \

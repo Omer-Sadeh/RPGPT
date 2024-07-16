@@ -3,8 +3,7 @@ import time
 from backend.Types.SaveData import SaveData
 from backend.Database.conn.ConnClass import Connection
 from backend.Database.conn.FirestoreConn import FirestoreConn
-from backend.Database.conn.LocalConn import LocalConn
-from backend.Utility import start_promise
+from backend.Utility import start_promise, CustomException
 
 
 def get_current_timestamp() -> int:
@@ -17,43 +16,14 @@ def get_current_timestamp() -> int:
 
 
 class DataBase:
-    local_conn: Connection = None
-    cloud_conn: Connection = None
+    conn: Connection = None
     gen_img: bool = False
 
     def __init__(self):
-        self.local_conn = LocalConn()
         try:
-            self.cloud_conn = FirestoreConn()
+            self.conn = FirestoreConn()
         except Exception as e:
-            logging.warning(f"Failed to connect to Firestore: {e}. No cloud used.")
-
-    def sync_conns(self, username: str) -> None:
-        """
-        Syncs the local and cloud databases, choosing the conn with the newer timestamp.
-
-        :param username: the name of the user
-        """
-        if self.cloud_conn is not None:
-            if self.cloud_conn is not None:
-                cloud_data = self.cloud_conn.read_all(username)
-                local_data = self.local_conn.read_all(username)
-
-                if cloud_data is None and local_data is None:
-                    return
-                if cloud_data is None:
-                    self.cloud_conn.commit_all(username, local_data, get_current_timestamp())
-                    return
-                if local_data is None:
-                    self.local_conn.commit_all(username, cloud_data, get_current_timestamp())
-                    return
-
-                cloud_time = cloud_data.get("timestamp", 0)
-                local_time = local_data.get("timestamp", 0)
-                if cloud_time > local_time:
-                    self.local_conn.commit_all(username, cloud_data, cloud_time)
-                elif cloud_time < local_time:
-                    self.cloud_conn.commit_all(username, local_data, local_time)
+            raise CustomException(f"Failed to connect to database: {e}.")
 
     def get_save_data(self, username: str, save_name: str) -> SaveData:
         """
@@ -61,19 +31,7 @@ class DataBase:
 
         :return: the content of the save file
         """
-        try:
-            return SaveData(self.local_conn.read(username, save_name))
-        except Exception as e:
-            logging.warning(f"Failed to read local save: {e}")
-            if self.cloud_conn is not None:
-                full_data = self.cloud_conn.read_all(username)
-                if save_name not in full_data:
-                    raise Exception("Save not found")
-                data = SaveData(full_data[save_name])
-                self.local_conn.commit_all(username, full_data, get_current_timestamp())
-                return data
-            else:
-                raise e
+        return SaveData(self.conn.read(username, save_name))
 
     def save_game_data(self, username: str, save_name: str, data: SaveData) -> None:
         """
@@ -85,9 +43,7 @@ class DataBase:
             logging.warning("Tried to commit earlier version. aborting commit.")
         else:
             timestamp = get_current_timestamp()
-            self.local_conn.commit(username, save_name, data.to_dict(), timestamp)
-            if self.cloud_conn is not None:
-                start_promise(self.cloud_conn.commit, username, save_name, data.to_dict(), timestamp)
+            self.conn.commit(username, save_name, data.to_dict(), timestamp)
         logging.info(f"Save completed: {save_name}")
 
     def create_save(self, username: str, save_name: str, data: SaveData) -> None:
@@ -103,9 +59,7 @@ class DataBase:
 
         logging.info(f"Creating save: {save_name}")
         timestamp = get_current_timestamp()
-        self.local_conn.commit(username, save_name, data.to_dict(), timestamp)
-        if self.cloud_conn is not None:
-            start_promise(self.cloud_conn.commit, username, save_name, data.to_dict(), timestamp)
+        self.conn.commit(username, save_name, data.to_dict(), timestamp)
         logging.info(f"Save created: {save_name}")
 
     def delete_save(self, username: str, save_name: str) -> None:
@@ -116,47 +70,40 @@ class DataBase:
         :param save_name: the name of the save file
         """
         logging.info(f"Deleting save: {save_name}")
-        self.local_conn.delete(username, save_name)
-        if self.cloud_conn is not None:
-            start_promise(self.cloud_conn.delete, username, save_name)
+        self.conn.delete(username, save_name)
         logging.info(f"Save deleted: {save_name}")
 
     def saves_list(self, username: str) -> list[str]:
         """
         Returns the list of user's saves in the Database.
         """
-        try:
-            return self.local_conn.get_all_saves(username)
-        except Exception as e:
-            logging.warning(f"Failed to read local saves: {e}")
-            if self.cloud_conn is not None:
-                full_data = self.cloud_conn.read_all(username)
-                self.local_conn.commit_all(username, full_data, get_current_timestamp())
-                return list(full_data.keys())
-            else:
-                raise e
+        return self.conn.get_all_saves(username)
 
     def save_exists(self, username: str, save_name: str):
         return save_name in self.saves_list(username)
 
-    def save_image(self, username: str, save_name: str, image_bytes: bytes) -> None:
+    def save_image(self, username: str, save_name: str, category: str, image_bytes: bytes) -> None:
         """
         Saves the image to the save file with the given name.
 
         :param username: the name of the user
         :param save_name: the name of the save file
+        :param category: the category of the image
         :param image_bytes: the image to be saved
         """
-        self.local_conn.save_image(username, save_name, image_bytes)
+        self.conn.save_image(username, save_name, category, image_bytes)
         logging.info(f"Image saved: {save_name}")
 
-    def get_save_image(self, username: str, save_name: str) -> str:
+    def get_save_image(self, username: str, save_name: str, category: str) -> str:
         """
         Returns the image of the save file with the given name.
 
+        :param username: the name of the user
+        :param save_name: the name of the save file
+        :param category: the category of the image
         :return: the image of the save file, as a base64 encoded string
         """
-        return self.local_conn.return_image_string(username, save_name)
+        return self.conn.return_image_string(username, save_name, category)
 
     def cache(self, username: str, save_name: str, key: str, data: any):
         """
@@ -167,7 +114,7 @@ class DataBase:
         :param key: the key of the cache
         :param data: the data to be cached
         """
-        self.local_conn.cache(username, save_name, key, data)
+        self.conn.cache(username, save_name, key, data)
 
     def get_cache(self, username: str, save_name: str, key: str):
         """
@@ -178,7 +125,7 @@ class DataBase:
         :param key: the key of the cache
         :return: the cache of the save file
         """
-        return self.local_conn.get_cache(username, save_name, key)
+        return self.conn.get_cache(username, save_name, key)
 
     def delete_cache(self, username: str, save_name: str, key: str):
         """
@@ -188,7 +135,7 @@ class DataBase:
         :param save_name: the name of the save file
         :param key: the key of the cache
         """
-        self.local_conn.delete_cache(username, save_name, key)
+        self.conn.delete_cache(username, save_name, key)
 
     def delete_all_cache(self, username: str, save_name: str):
         """
@@ -197,4 +144,4 @@ class DataBase:
         :param username: the name of the user
         :param save_name: the name of the save file
         """
-        self.local_conn.delete_all_cache(username, save_name)
+        self.conn.delete_all_cache(username, save_name)

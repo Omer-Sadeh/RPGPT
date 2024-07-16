@@ -208,6 +208,7 @@ class SaveData:
             self.background["location"] = result["new_location"]
         self.add_xp(result_xp)
         self.story["status"] = result["action_result"]
+        self.shop.close()
 
     def add_xp(self, xp: int):
         """

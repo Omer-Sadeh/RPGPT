@@ -1,4 +1,6 @@
 import base64
+import pathlib
+
 from firebase_admin import credentials, firestore, initialize_app, storage
 from backend.Database.conn.ConnClass import Connection, hash_key
 
@@ -17,14 +19,16 @@ class FirestoreConn(Connection):
 
     def read(self, username: str, save_name: str) -> dict | None:
         if not username:
-            return None
+            raise Exception("Username not provided.")
 
         full_data = self.db.collection("users").document(username).get()
         if full_data.exists:
             full_data = full_data.to_dict()
+            if save_name not in full_data:
+                raise Exception("Save not found!")
             return full_data[save_name]
         else:
-            return None
+            raise Exception("User not found!")
 
     def read_all(self, username: str) -> dict:
         if not username:
@@ -63,6 +67,17 @@ class FirestoreConn(Connection):
             if save_name in full_data.to_dict():
                 self.db.collection("users").document(username).update({save_name: firestore.DELETE_FIELD})
 
+        cache_data = self.db.collection("cache").document(username).get()
+        if cache_data.exists:
+            if save_name in cache_data.to_dict():
+                self.db.collection("cache").document(username).update({save_name: firestore.DELETE_FIELD})
+
+        img_categories = ["shop", "character", "scene"]
+        for category in img_categories:
+            blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".png")
+            if blob.exists():
+                blob.delete()
+
     def get_all_saves(self, username: str) -> list[str]:
         if not username:
             return []
@@ -77,14 +92,15 @@ class FirestoreConn(Connection):
         else:
             return []
 
-    def save_image(self, username: str, save_name: str, image_bytes: bytes) -> None:
-        blob = self.bucket.blob(username + "_" + save_name + ".png")
+    def save_image(self, username: str, save_name: str, category: str, image_bytes: bytes) -> None:
+        blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".png")
         blob.upload_from_string(image_bytes, content_type='image/png')
 
-    def return_image_string(self, username: str, save_name: str) -> str:
-        blob = self.bucket.blob(username + "_" + save_name + ".png")
+    def return_image_string(self, username: str, save_name: str, category: str) -> str:
+        blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".png")
         if not blob.exists():
-            raise Exception("Image does not exist.")
+            with open(str(pathlib.Path(__file__).parent.resolve()) + "/default_" + category + ".png", "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
         img_bytes = blob.download_as_string()
         return base64.b64encode(img_bytes).decode()
 

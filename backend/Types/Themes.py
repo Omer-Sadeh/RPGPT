@@ -14,7 +14,7 @@ Available_Themes = [
         ],
         extra_fields=[
             {"field": "profession", "value": ["Barbarian"], "extra_field": "Tribe", "extra_field_value": "the player's tribe name"},
-            {"field": "profession", "value": ["Mage"], "extra_field": "School", "extra_field_value": "the player's Mages' School"},
+            {"field": "profession", "value": ["Mage"], "extra_field": "Magic School", "extra_field_value": "the player's magic school"},
         ]
     ),
     Theme(

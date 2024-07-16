@@ -6,7 +6,7 @@ class Inventory:
     Inventory class representing a player's inventory.
     """
     # Initial categories for the inventory
-    categories = ["weapon", "head", "body", "feet", "neck", "ring", "backpack"]
+    categories = []
 
     def __init__(self, inventory: dict = None, extra_categories: list = None):
         """
@@ -15,6 +15,8 @@ class Inventory:
         :param inventory: A dictionary of an existing inventory - optional.
         :param extra_categories: A list of extra categories to add to the inventory - optional.
         """
+        self.categories = ["weapon", "head", "body", "feet", "neck", "ring", "backpack"]
+        
         for category in self.categories:
             setattr(self, category, [])
 
@@ -103,6 +105,9 @@ class Inventory:
         if category not in self.categories:
             self.categories.append(category)
             setattr(self, category, [])
+
+        if isinstance(items, str):
+            items = [items]
         setattr(self, category, self.__getattribute__(category) + items)
 
     def remove_item(self, item: str, category: str) -> None:

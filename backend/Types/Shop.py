@@ -21,19 +21,24 @@ class Shop:
         else:
             self.close()
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict | str:
         """
         Return shop data as dictionary if it is open, and empty dictionary otherwise.
 
         :return: shop data
         """
-        return {
-            "sold_items": self.sold_items,
-            "buy_items": self.buy_items,
-            "prompt": self.prompt,
-            "shopkeeper_description": self.shopkeeper_description,
-            "shopkeeper_recommendation": self.shopkeeper_recommendation
-        } if self.status == "open" else {}
+        if self.status == "open":
+            return {
+                "sold_items": self.sold_items,
+                "buy_items": self.buy_items,
+                "prompt": self.prompt,
+                "shopkeeper_description": self.shopkeeper_description,
+                "shopkeeper_recommendation": self.shopkeeper_recommendation
+            }
+        elif self.status == "generating":
+            return "generating"
+        else:
+            return {}
 
     def _reset(self, status: str):
         """

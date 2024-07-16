@@ -1,0 +1,162 @@
+.adventureContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    height: 95%;
+    width: 95%;
+}
+
+.adventureScene {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    height: 50%;
+}
+
+.sceneImgCon {
+    position: relative;
+    width: 40%;
+}
+
+.sceneImg {
+    width: 50%;
+    object-fit: cover;
+    border: 1px solid aliceblue;
+    border-radius: 1vmin;
+
+    box-shadow: 0 0 10px 5px rgba(0, 0, 0, 0.36);
+
+    pointer-events: none;
+    -webkit-user-drag: none;
+}
+
+.sceneLocationText {
+    position: absolute;
+    bottom: 5%;
+    left: 25%;
+
+    text-align: center;
+    width: 50%;
+
+    background-color: rgba(0, 0, 0, 0.21);
+    color: rgba(240, 248, 255, 0.55);
+}
+
+.sceneText {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    font-size: 1em;
+    text-align: center;
+    width: 60%;
+    height: 100%;
+    padding: 1vmin;
+    overflow-y: auto;
+}
+
+.success {
+    color: #089308;
+    font-weight: bold;
+}
+
+.fail {
+    color: #8c0000;
+    font-weight: bold;
+}
+
+.adventureOptions {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 50%;
+}
+
+.actionCardContent {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    width: 95%;
+    height: 95%;
+}
+
+.actionCardValue {
+    height: 100%;
+    font-size: 70%;
+}
+
+.actionCardEmpty {
+    height: 100%;
+    font-size: 200%;
+    color: rgba(240, 248, 255, 0.65);
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.actionCardStats {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+
+    font-size: 60%;
+}
+
+.actionCardAdv {
+    font-size: 60%;
+    color: rgba(240, 248, 255, 0.65);
+}
+
+.actionCardAdv.reached {
+    color: rgba(4, 93, 4, 0.65);
+}
+
+.actionCardXp {
+    color: #045d04;
+}
+
+.createOptionCardContent {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.createOptionInput {
+    width: 100%;
+    height: 2.8rem;
+    border-radius: 1vmin;
+    border: 1px solid rgba(240, 248, 255, 0.5);
+    background-color: rgb(20, 30, 51);
+
+    padding: 0 0.5rem;
+    margin: 1rem;
+
+    font-family: "Rubik", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 500;
+    font-style: normal;
+    font-size: 1rem;
+    color: aliceblue;
+}
+
+.createOptionInput:focus {
+    outline: 1px solid aliceblue;
+}
+
+.createOptionMargin {
+    margin: 0 1rem 0 0;
+}

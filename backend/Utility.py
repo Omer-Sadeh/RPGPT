@@ -85,7 +85,7 @@ def APIEndpoint(func: callable) -> callable:
         logging.debug(f"Arguments: {args}, {kwargs}")
         result = func(*args, **kwargs)
         logging.info(f"--------- API call: {func.__name__} finished!")
-        if func.__name__ != "get_image":
+        if func.__name__ not in ["get_image", "get_saves_list"]:
             logging.debug(f"--------- {func.__name__} result: {result}")
         return result
     return wrapper
@@ -122,7 +122,10 @@ def await_promise(promise: concurrent.futures.Future) -> dict:
     """
     try:
         result = promise.result()
-        logging.debug(f"Promise completed, result: {str(result)}")
+        if "result" in result and isinstance(result["result"], bytes):
+            logging.debug(f"Promise completed, result: <image>")
+        else:
+            logging.debug(f"Promise completed, result: {str(result)}")
         return result
     except Exception as e:
         logging.warning(f"An error occurred while awaiting a promise: {str(e)}")

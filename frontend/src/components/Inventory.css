@@ -1,0 +1,35 @@
+.InventoryContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1vmin;
+    margin-right: 1vmin;
+    margin-left: 1vmin;
+}
+
+.InventoryTabs {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin: 2vmin 1vmin;
+}
+
+.InventoryItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 1vmin;
+}
+
+.InventoryItemName {
+    font-size: 2vmin;
+    font-weight: bold;
+}
+
+.InventoryItemTab {
+    font-size: 1.4vmin;
+    color: rgba(240, 248, 255, 0.5);
+}

@@ -4,47 +4,57 @@
 
 RPGPT is a game that generates a text-based adventure for a user-created character, aimed to act as a human game master in a tabletop RPG game.
 The game is based on the [GPT-4](https://openai.com/) language model, and uses a [HuggingFace](https://huggingface.co/) space for the text-to-image feature.
-The backend is hosted on a Flask server, and the frontend is a CLI interface.
+The backend is hosted on a FastAPI server, and a react frontend hosted on an electron app.
 This project was created for fun and as a learning experience, and is open for contributions and improvements.
 Used technologies in the project:
 - FastAPI
 - OpenAI API
 - HuggingFace API
 - Firebase Database
+- React
+- Electron
 
 ## Installation
 
-First, set your openai and huggingface api keys and the auth secret you want to use in the `./envfile` file.
-(You can get an openai api key [here](https://platform.openai.com/) and a huggingface api key [here](https://huggingface.co/)
-(huggingface key is optional, and required only for the experimental T2I feature.)).
+### Credentials Setup
+First set-up the following environment variables in the `./envfile` file:
+- `OPENAI_API_KEY`: Your OpenAI API key (You can get an openai api key [here](https://platform.openai.com/)).
+- `HUGGINGFACE_BEARER`: Your HuggingFace API key (You can get a huggingface api key [here](https://huggingface.co/)).
+- `AUTH_SECRET`: The secret you want to use for the JWT authentication.
+- `REACT_APP_BACKEND_URL`: Your backend URL (default is `http://localhost:8000`).
+- `FIREBASE_API_KEY` and all other Firebase environment variables.
+
+To set up a Firebase project go [here](https://firebase.google.com/), and create a new project.
+Then, go to the project settings and get the Firebase SDK snippet for the envfile variables.
+Now, download the firebase service account key and save it in a `./backend/Database/conn/firebaseAuth.json` file.
+
 Then:
 
 ```bash
-cp envfile .env
-pip install -r requirements.txt
+cp envfile ./backend/.env
+cp envfile ./frontend/.env
 ```
 
-If you want to use the Firebase Database for data backup,
-you will need to set up a Firebase project and download the service account key.
-Then, save the service account key in a `./backend/Database/conn/firebaseAuth.json` file.
-
-## Usage
-
+### Installation
 ```bash
-python main.py
+pip install -r requirements.txt
+cd frontend
+npm install
 ```
 
-Use the `--cli` flag to only run the CLI, and the `--server` flag to only run the flask server containing the backend.
+## Running the Game
+
+Just the `main.py` file in the `root` directory and follow the instructions.
 
 ## AI Models
 
 ### LLM
-Currently the game uses OpenAI's gpt-4.
+Currently, the game uses OpenAI's gpt-4.
 This model can be changed in the `backend/GenAI/LLM/LLM.py` file, by generating a new ModelClass object with the desired model.
 The model is then used with the `generate` function, so if the model is changed, the `generate` function must keep its functionality.
-Warning: The game has only been tested with gpt-4.
+**Warning**: The game has only been tested with gpt-4.
 
-### T2I (EXPERIEMENTAL)
+### T2I
 Currently,
 the game uses [stabilityai's stable-diffusion-xl-base-1.0](https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0) from an open HuggingFace space.
 This model can be changed in the `backend/GenAI/T2I.py` file.
@@ -67,6 +77,19 @@ The optional parameters are:
 - `extra_fields`: A list of extra fields that the character has.
 - `skills`: A list of skills that the character has to replace the defaults (see `backend/Types/Theme.py` for the default skills).
 You can see examples for all of these in the `backend/Types/Themes.py` file, in the existing themes.
+
+## Plans / Open for Contributions
+
+1. **Make an actually good UI.**
+I'm not an expert in React or frontend development, so the React code is quite messy and external libraries dependent.
+It would be great if someone who knows what they're doing could clean up the code and make a better UI.
+2. Upgrade the SNS system, so it would be better at protecting the LLM's from attacks. Currently, it's at a placeholder level.
+3. Overhaul the logging system.
+Currently, the logging system is very basic and local.
+It would be nice to have a more robust logging system
+that can be used for debugging and monitoring in an actual backend server.
+4. Work out a testing framework, both for the backend and the frontend. Currently, there are no tests for the project.
+5. Test out other AI models (such as Gemini, Claude...), and see if they can be used in the game.
 
 ## Contributing
 

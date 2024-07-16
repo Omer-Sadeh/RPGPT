@@ -1,0 +1,124 @@
+.boardGrid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+
+    height: 100%;
+    width: 100%;
+}
+
+.DropOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.actionCardPlaceholder {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 15vmin;
+    height: 10vmax;
+
+    margin-top: 15vh;
+
+    border: 1px solid rgba(240, 248, 255, 0.9);
+    border-radius: 1vmin;
+    background-color: #0e1525;
+    opacity: 1.75;
+}
+
+.cardsGrid {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+
+    margin-top: 2.5vh;
+
+    height: 80%;
+    width: 90%;
+}
+
+.actionCard {
+    position: relative;
+    z-index: 3;
+    cursor: pointer;
+
+    font-size: 3vmin;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 15vw;
+    height: 100%;
+
+    margin: 5px;
+
+    border: 1px solid aliceblue;
+    border-radius: 1vmin;
+    background-color: #0e1525;
+}
+
+.actionCard:hover {
+    box-shadow: 0 0 10px 5px rgba(0, 0, 0, 0.36);
+}
+
+.actionCardNew {
+    cursor: auto;
+}
+
+.actionCardTextArea {
+    width: 100%;
+    height: 100%;
+    padding: 0.5vmin;
+    color: white;
+    background-color: #0e1525;
+    border: none;
+    resize: none;
+    text-align: center;
+
+    font-family: "Rubik", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 500;
+    font-style: normal;
+    font-size: 70%;
+
+    margin-bottom: 1vmin;
+}
+
+.actionCardTextArea:focus {
+    outline: none;
+}
+
+.actionCardContentCenter {
+    justify-content: center;
+}
+
+.dragTootip {
+    position: absolute;
+    z-index: 4;
+    top: -3vmin;
+    left: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    font-size: 1vmin;
+    color: rgba(240, 248, 255, 0.5);
+}

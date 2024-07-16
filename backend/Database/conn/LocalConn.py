@@ -51,8 +51,8 @@ class LocalConn(Connection):
     def get_cache_path(self, username: str) -> str:
         return self.saves_path + "/" + str(username) + "_cache.json"
 
-    def get_image_path(self, username: str, save_name: str) -> str:
-        return self.saves_path + "/" + str(username) + "_" + save_name + ".png"
+    def get_image_path(self, username: str, save_name: str, category: str) -> str:
+        return self.saves_path + "/" + str(username) + "_" + save_name + "_" + category + ".png"
 
     def validate_user_file(self, username: str) -> None:
         """
@@ -104,8 +104,11 @@ class LocalConn(Connection):
         with open(self.get_save_path(username), "w") as save_file:
             del user_data[save_name]
             json.dump(user_data, save_file, indent=2, separators=(', ', ' : '))
-        if os.path.exists(self.get_image_path(username, save_name)):
-            os.remove(self.get_image_path(username, save_name))
+
+        img_categories = ["shop", "character", "scene"]
+        for category in img_categories:
+            if os.path.exists(self.get_image_path(username, save_name, category)):
+                os.remove(self.get_image_path(username, save_name, category))
 
     def get_all_saves(self, username: str) -> list[str]:
         self.validate_user_file(username)
@@ -117,14 +120,15 @@ class LocalConn(Connection):
             key_list.remove("timestamp")
         return key_list
 
-    def save_image(self, username: str, save_name: str, image_bytes: bytes) -> None:
+    def save_image(self, username: str, save_name: str, category: str, image_bytes: bytes) -> None:
         image = Image.open(io.BytesIO(image_bytes))
-        image.save(self.get_image_path(username, save_name))
+        image.save(self.get_image_path(username, save_name, category))
 
-    def return_image_string(self, username: str, save_name: str) -> str:
-        if not os.path.exists(self.get_image_path(username, save_name)):
-            raise Exception("No image found.")
-        with open(self.get_image_path(username, save_name), "rb") as image_file:
+    def return_image_string(self, username: str, save_name: str, category: str) -> str:
+        if not os.path.exists(self.get_image_path(username, save_name, category)):
+            with open(str(pathlib.Path(__file__).parent.resolve()) + "/default_" + category + ".png", "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        with open(self.get_image_path(username, save_name, category), "rb") as image_file:
             return base64.b64encode(image_file.read()).decode()
 
     @cache_lock_wrapper

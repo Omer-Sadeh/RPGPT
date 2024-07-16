@@ -77,22 +77,24 @@ class Connection:
         """
         raise NotImplementedError
 
-    def save_image(self, username: str, save_name: str, image_bytes: bytes) -> None:
+    def save_image(self, username: str, save_name: str, category: str, image_bytes: bytes) -> None:
         """
         This method is used to save an image to the database.
 
         :param username: The username of the user.
         :param save_name: The name of the save.
+        :param category: The category of the image.
         :param image_bytes: The image bytes.
         """
         raise NotImplementedError
 
-    def return_image_string(self, username: str, save_name: str) -> str:
+    def return_image_string(self, username: str, save_name: str, category: str) -> str:
         """
         This method is used to return the save's image bytes as a string.
 
         :param username: The username of the user.
         :param save_name: The name of the save.
+        :param category: The category of the image.
         :return: The image bytes as a string.
         """
         raise NotImplementedError

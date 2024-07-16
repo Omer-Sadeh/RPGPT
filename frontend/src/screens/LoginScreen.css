@@ -1,0 +1,103 @@
+.LoginPage {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+.userTitle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-size: calc(10px + 4vmin);
+}
+
+.userTitle img {
+    width: 35vmin;
+}
+
+.userSubTitle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 10px;
+    font-size: calc(10px + 2vmin);
+    text-decoration: underline;
+}
+
+.userForm {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin: 20px;
+}
+
+.userInput {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: min(100%, 300px);
+    margin: 10px;
+}
+
+.userInput input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px;
+    border: 1px solid aliceblue;
+    border-radius: 5px;
+    background-color: rgba(20, 30, 51, 0);
+    color: aliceblue;
+    font-size: calc(10px + 1vmin);
+}
+
+.userInput input:focus {
+    background-color: rgba(255, 255, 255, 0.05);
+    outline: none;
+}
+
+.userLink {
+    margin-top: 15px;
+    font-size: calc(10px + 0.5vmin);
+}
+
+.userLink a {
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.userLink a:hover {
+    color: #c42d2d;
+}
+
+.userError {
+    font-size: calc(10px + 0.2vmin);
+    color: #c42d2d;
+    cursor: default;
+    height: calc(10px + 0.2vmin);
+
+    margin-bottom: 2vh;
+}
+
+.shaking {
+    animation: shake 0.4s;
+}
+
+@keyframes shake {
+    0% { transform: translateX(0) }
+    25% { transform: translateX(5px) }
+    50% { transform: translateX(-5px) }
+    75% { transform: translateX(5px) }
+    100% { transform: translateX(0) }
+}

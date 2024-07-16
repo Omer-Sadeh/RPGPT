@@ -1,0 +1,63 @@
+.header {
+    height: 5vh;
+    width: 100%;
+    border-bottom: 1px solid aliceblue;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    z-index: 100;
+
+    background-color: rgb(20, 30, 51);
+}
+
+.headerTitle {
+    display: flex;
+    align-items: center;
+    margin-left: 20px;
+    font-weight: bold;
+}
+
+.headerUser {
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+}
+
+.headerUser > * {
+    margin-left: 10px;
+}
+
+.headerSaveMenu {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 10%;
+    max-width: 90%;
+}
+
+.headerSaveMenu > .HealthBar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5vw;
+
+    margin-left: 20px;
+}
+
+.headerSaveMenu > .HealthBar > .HealthBarTitle {
+    font-size: 0.8em;
+}
+
+.headerSaveMenu > .headerSaveMenuButtons {
+    display: flex;
+    align-items: center;
+
+    margin-right: 20px;
+}
+
+.headerSaveMenu > .headerSaveMenuButtons > button {
+    margin-left: 10px;
+}

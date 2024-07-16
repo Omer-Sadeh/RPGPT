@@ -1,3 +1,4 @@
+import logging
 import time
 import backend.GenAI.T2I as T2I
 from backend.Types.Theme import Theme
@@ -159,14 +160,14 @@ class Game:
             logging.debug(f"Generated shop: {result}")
 
             result["image"] = None
-            if img_flag:
+            if img_flag and "prompt" in result:
                 logging.info("Generating shop image..." if not DEBUG else "Generating shop image. Prompt: " + result["prompt"])
                 img = T2I.generate(result["prompt"])
                 if img["status"] == "error":
                     logging.error(f"Shop generation image error: {img['reason']}")
                     raise Exception(img["reason"])
                 else:
-                    self.DB.save_image(username, save_name, img["result"])
+                    self.DB.save_image(username, save_name, "shop", img["result"])
                 logging.info("Generated shop image.")
             logging.info("Generated shop.")
             return result
@@ -210,6 +211,7 @@ class Game:
         result = self.LLM.generate_backstory(theme, background)
         if result["status"] == "success":
             result = result["result"]
+            logging.info("Generated backstory: " + str(result))
             result["inventory"] = Inventory(result["inventory"]).to_dict()
             logging.info("Generated backstory.")
             logging.debug(f"Generated backstory: {result}")
@@ -266,9 +268,6 @@ class Game:
 
         :return: The status of each model.
         """
-        if DEBUG:
-            return []
-
         # Call the LLM and T2I GenAI with a testing prompt.
         # This is done in a non-blocking way to speed up the response.
         test_llm_promise = start_promise(self.LLM.test)
@@ -294,19 +293,19 @@ class Game:
         Get the list of all the saves.
 
         :param username: The username of the player.
-        :return: The list of all the saves.
+        :return: The list of all the saves and their respective images.
         """
-        self.DB.sync_conns(username)
-        return self.DB.saves_list(username)
+        saves = self.DB.saves_list(username)
+        return [{"name": save, "image": self.DB.get_save_image(username, save, 'character')} for save in saves]
 
     @APIEndpoint
     def get_available_themes(self) -> dict:
         """
-        Get the list of all the available themes.
+        Get the list of all the available themes and their required fields.
 
         :return: The list of all the available themes.
         """
-        return {theme.name: theme.todict() for theme in Available_Themes}
+        return {theme.name: {"name": theme.name, "fields": theme.fields} for theme in Available_Themes}
 
     @APIEndpoint
     def load_save(self, username: str, save_name: str, img_flag: bool) -> dict:
@@ -332,13 +331,14 @@ class Game:
         return self.DB.get_save_data(username, save_name).to_dict()
 
     @APIEndpoint
-    def new_save(self, username: str, theme_name: str, background: dict) -> str:
+    def new_save(self, username: str, theme_name: str, background: dict, img_flag: bool) -> str:
         """
         Create a new save with the given data.
 
         :param username: The username of the player.
         :param theme_name: The theme of the save.
         :param background: The background of the save.
+        :param img_flag: Whether to generate an image for the character.
         """
         logging.info(f"Creating new save with theme: {theme_name} and background: {background}")
 
@@ -377,11 +377,19 @@ class Game:
         # process and validate the save name
         save_name = process_save_name(background["name"])
         while self.DB.save_exists(username, save_name):
-            save_name += " (copy)"
+            save_name += "_(copy)"
 
         # Create the save with the given data
         save_data = SaveData(theme=theme_name, background=background, inventory=result["inventory"])
         self.DB.create_save(username, save_name, save_data)
+
+        # Generate the character image if needed
+        if img_flag:
+            img = T2I.generate(result["prompt"])
+            if img["status"] == "error":
+                raise Exception(img["reason"])
+            else:
+                self.DB.save_image(username, save_name, "character", img["result"])
 
         return save_name
 
@@ -537,9 +545,9 @@ class Game:
             if img_flag:
                 img = T2I.generate(result["prompt"])
                 if img["status"] == "error":
-                    raise Exception(img["reason"] + "\n" + "prompt: " + result["prompt"])
+                    logging.error(img["reason"] + "\n" + "prompt: " + result["prompt"])
                 else:
-                    self.DB.save_image(username, save_name, img["result"])
+                    self.DB.save_image(username, save_name, "scene", img["result"])
 
             # Update the story and generate the cache for the next actions
             player_data.update_story(result, action)
@@ -784,11 +792,12 @@ class Game:
         start_promise(self.generate_no_story_data, username, save_name, img_flag)
 
     @APIEndpoint
-    def get_image(self, username: str, save_name: str) -> str:
+    def get_image(self, username: str, save_name: str, category: str) -> str:
         """
         Get the image of the last generated prompt, as a base64 string.
 
         :param username: The username of the player.
         :param save_name: The name of the save.
+        :param category: The category of the image.
         """
-        return self.DB.get_save_image(username, save_name)
+        return self.DB.get_save_image(username, save_name, category)
