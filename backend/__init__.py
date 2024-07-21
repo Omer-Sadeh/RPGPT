@@ -1,5 +1,5 @@
 import backend.SNS.SNS as SNS
 from dotenv import load_dotenv
 
-DEBUG = False
+DEBUG = True
 load_dotenv()

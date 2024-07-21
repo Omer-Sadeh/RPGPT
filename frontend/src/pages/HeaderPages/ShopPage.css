@@ -1,3 +1,9 @@
+.ShopGold {
+    font-size: 2vh;
+    font-weight: bold;
+    color: goldenrod;
+}
+
 .ShopContainer {
     display: flex;
     flex-direction: column;

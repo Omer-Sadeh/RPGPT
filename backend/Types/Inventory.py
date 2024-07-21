@@ -122,3 +122,12 @@ class Inventory:
         if item not in getattr(self, category):
             raise ValueError(f"Item {item} not in category {category}")
         getattr(self, category).remove(item)
+
+    def merge_with(self, other):
+        """
+        Merge the inventory with another inventory.
+
+        :param other: The other inventory to merge with.
+        """
+        for category in other.categories:
+            self.add_items(other[category], category)

@@ -44,7 +44,7 @@ function NewActionCard({hide, add}: { hide: boolean, add: any}) {
         if (editMode) {
             if (loading) {
                 return (
-                    <div className="actionCardContent actionCardContentCenter">
+                    <div className="actionCardContent actionCardContentCenter" key={"+"}>
                         <ClipLoader
                             color={"aliceblue"}
                             loading={true}
@@ -57,7 +57,7 @@ function NewActionCard({hide, add}: { hide: boolean, add: any}) {
             }
 
             return (
-                <div className="actionCardContent">
+                <div className="actionCardContent" key={"+"}>
                     <textarea className="actionCardTextArea" placeholder="Enter new action"
                               value={value} onChange={(e) => setValue(e.target.value)} />
                     <Button text={value !== "" ? "Add" : "Back"} func={handleAdd} />
@@ -65,14 +65,14 @@ function NewActionCard({hide, add}: { hide: boolean, add: any}) {
             );
         }
         return (
-            <div className="actionCardContent">
+            <div className="actionCardContent" key={"+"}>
                 <div className="actionCardEmpty">+</div>
             </div>
         );
     }
 
     return (
-        <motion.div className={editMode ? "actionCard actionCardNew" : "actionCard"}
+        <motion.div className={editMode ? "actionCard actionCardNew" : "actionCard"} key={"+"}
                     onClick={editMode ? () => null : () => setEditMode(true)}
                     initial={{opacity: hide ? 1 : 0}}
                     animate={{opacity: hide ? 0 : 1}}
@@ -91,14 +91,14 @@ function Draggable({children, id, hide, dragging}: { children: any, id: any, hid
 
     if (hide) {
         return (
-            <motion.div className="actionCard" style={style}
+            <motion.div className="actionCard" style={style} key={id}
                         initial={{opacity: 1}} animate={{opacity: 0}} transition={{duration: 1}} exit={{opacity: 0}}>
                 {children}
             </motion.div>
         );
     }
     return (
-        <motion.div ref={setNodeRef} className="actionCard" style={style} {...listeners} {...attributes}
+        <motion.div ref={setNodeRef} className="actionCard" style={style} key={id} {...listeners} {...attributes}
                     initial={{opacity: 0}} animate={{opacity: 1}} transition={{duration: 1}} exit={{opacity: 0}}>
             {children}
             {!dragging &&

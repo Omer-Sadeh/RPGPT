@@ -73,11 +73,15 @@ class DataBase:
         self.conn.delete(username, save_name)
         logging.info(f"Save deleted: {save_name}")
 
-    def saves_list(self, username: str) -> list[str]:
+    def saves_list(self, username: str) -> dict:
         """
         Returns the list of user's saves in the Database.
         """
-        return self.conn.get_all_saves(username)
+        ids = self.conn.get_all_saves(username)
+        saves_list = {}
+        for save_id in ids:
+            saves_list[save_id] = self.get_save_data(username, save_id).background["name"]
+        return saves_list
 
     def save_exists(self, username: str, save_name: str):
         return save_name in self.saves_list(username)

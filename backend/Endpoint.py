@@ -90,18 +90,6 @@ def delete(save_name: str, authorization: str = Header(None)):
     return API.delete_save(username, save_name)
 
 
-@app.get('/goals/', dependencies=[Depends(JWTBearer())])
-def goals(save_name: str, regen: bool, authorization: str = Header(None)):
-    username = AuthDB.decode_token(authorization.split(' ')[1])
-    return API.get_goals(username, save_name, regen)
-
-
-@app.get('/new_story/', dependencies=[Depends(JWTBearer())])
-def new_story(save_name: str, goal: Union[str, None], authorization: str = Header(None)):
-    username = AuthDB.decode_token(authorization.split(' ')[1])
-    return API.new_story(username, save_name, goal)
-
-
 @app.get('/advance/', dependencies=[Depends(JWTBearer())])
 def advance(action: str, save_name: str, images: Annotated[str | None, Header()], authorization: str = Header(None)):
     username = AuthDB.decode_token(authorization.split(' ')[1])
@@ -136,12 +124,6 @@ def buy(item_name: str, save_name: str, authorization: str = Header(None)):
 def sell(item_name: str, save_name: str, authorization: str = Header(None)):
     username = AuthDB.decode_token(authorization.split(' ')[1])
     return API.sell_item(username, save_name, item_name)
-
-
-@app.get('/end_story/', dependencies=[Depends(JWTBearer())])
-def end(save_name: str, images: Annotated[str | None, Header()], authorization: str = Header(None)):
-    username = AuthDB.decode_token(authorization.split(' ')[1])
-    return API.end_game(username, save_name, images == "True")
 
 
 @app.get('/image/', dependencies=[Depends(JWTBearer())])

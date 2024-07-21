@@ -10,7 +10,7 @@ import { FaFortAwesomeAlt } from "react-icons/fa6";
 function Header({username, data, cards, unload, logout} : {username: string, data: any, cards: any[], unload: () => void, logout: () => void}) {
 
     const renderSaveMenu = () => {
-        let health = data.data.story.health ? data.data.story.health : 5;
+        let health = data.data.story.health;
 
         return (
             <div className="headerSaveMenu">

@@ -6,6 +6,8 @@ import GameScreen from "./screens/GameScreen";
 import LoginScreen from "./screens/LoginScreen";
 import Screen from "./screens/Screen";
 import AUTH from "./services/auth";
+import {ToastContainer} from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
     const [status, setStatus] = useState("loading");
@@ -53,6 +55,19 @@ function App() {
     return (
         <div className="App noselect">
             {renderScreen()}
+            <ToastContainer
+                position="top-center"
+                autoClose={2000}
+                limit={1}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable={false}
+                pauseOnHover
+                theme="dark"
+            />
         </div>
     );
 }

@@ -25,20 +25,20 @@ const item = {
     }
 };
 
-function SavesList({saves, loadSave, newSave, deleteSave} : {saves: any[], loadSave: (save: string) => void, newSave: () => void, deleteSave: (save: string) => void}) {
+function SavesList({saves, loadSave, newSave, deleteSave} : {saves: any, loadSave: (save: string) => void, newSave: () => void, deleteSave: (save: string) => void}) {
 
     const Card = ({children, func} : {children: any, func: () => void}) =>
         <motion.div className="card" whileHover={{scale: 1.02}} whileTap={{scale: 0.98}} onClick={func}>{children}</motion.div>
 
     const renderSaves = () => {
-        return saves.slice(0, 4).map((save) => (
-            <motion.li key={save.name} className="item" variants={item}>
-                <Card func={() => loadSave(save.name)}>
-                    <ImageLoader bytes={save.image} alt={"character"} className={"cardImg"} />
-                    <div className="cardText">{save.name}</div>
+        return Object.keys(saves).slice(0, 4).map((save) => (
+            <motion.li key={saves[save].id} className="item" variants={item}>
+                <Card func={() => loadSave(saves[save].id)}>
+                    <ImageLoader bytes={saves[save].image} alt={"character"} className={"cardImg"} />
+                    <div className="cardText">{saves[save].name}</div>
                 </Card>
                 <div className="space"/>
-                <Button text={<FaTrashAlt />} func={() => deleteSave(save.name)}/>
+                <Button text={<FaTrashAlt />} func={() => deleteSave(saves[save].id)}/>
             </motion.li>
         ));
     }

@@ -103,12 +103,6 @@ class API {
         }, {});
     }
 
-    static async endGame(auth: string, save: string) {
-        return await req('end_story', auth, {
-            save_name: save
-        }, {});
-    }
-
     static async getImage(auth: string, save: string, category: string) {
         return await req('image', auth, {
             save_name: save,

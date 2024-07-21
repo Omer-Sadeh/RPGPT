@@ -31,26 +31,11 @@ function ShopItem({item, category, price, func} : {item: string, category: strin
     );
 }
 
-function ShopPage({saveData, saveName}: { saveData: any, saveName: string }) {
+function ShopPage({saveData, saveName, img}: { saveData: any, saveName: string, img: string }) {
     const [mode, setMode] = useState("main");
-    const [imgString, setImgString] = useState<string>("");
-
-    useEffect(() => {
-        getShopImage().then();
-        // eslint-disable-next-line
-    }, []);
-
-    const getShopImage = async () => {
-        return await API.getImage(AUTH.getToken(), saveName, 'shop').then((data) => {
-            setImgString(data);
-        }).catch((error: any) => {
-            setImgString("");
-        });
-    }
 
     const getShop = async () => {
         await API.shop(AUTH.getToken(), saveName).then();
-        await getShopImage();
     }
 
     const chooseItem = async (item: string, mode: "buy" | "sell") => {
@@ -92,10 +77,12 @@ function ShopPage({saveData, saveName}: { saveData: any, saveName: string }) {
 
     return (
         <div className="ShopContainer">
-            <h1>Shop</h1>
+            <h1>Shop <span className="ShopGold">
+                [ {saveData.coins} Gold ]
+            </span></h1>
             {(typeof saveData.shop === 'string') ? "Searching for a shop around..." : (Object.keys(saveData.shop).length === 0 ? <Button text={"Look for a shop"} func={getShop} /> :
                 <div className="ShopContent">
-                    <ImageLoader bytes={imgString} alt={"shopImage"} className={"ShopkeeperImage"} />
+                    <ImageLoader bytes={img} alt={"shopImage"} className={"ShopkeeperImage"} />
                     <div className="ShopkeeperName">{saveData.shop.shopkeeper_description}:</div>
                     <div className="ShopkeeperDialogue">"{saveData.shop.shopkeeper_recommendation}"</div>
                     {renderShopMenu()}

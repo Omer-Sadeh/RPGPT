@@ -74,7 +74,7 @@ class FirestoreConn(Connection):
 
         img_categories = ["shop", "character", "scene"]
         for category in img_categories:
-            blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".png")
+            blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".jpg")
             if blob.exists():
                 blob.delete()
 
@@ -93,13 +93,13 @@ class FirestoreConn(Connection):
             return []
 
     def save_image(self, username: str, save_name: str, category: str, image_bytes: bytes) -> None:
-        blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".png")
-        blob.upload_from_string(image_bytes, content_type='image/png')
+        blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".jpg")
+        blob.upload_from_string(image_bytes, content_type='image/jpg')
 
     def return_image_string(self, username: str, save_name: str, category: str) -> str:
-        blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".png")
+        blob = self.bucket.blob(username + "_" + save_name + "_" + category + ".jpg")
         if not blob.exists():
-            with open(str(pathlib.Path(__file__).parent.resolve()) + "/default_" + category + ".png", "rb") as image_file:
+            with open(str(pathlib.Path(__file__).parent.resolve()) + "/default_" + category + ".jpg", "rb") as image_file:
                 return base64.b64encode(image_file.read()).decode()
         img_bytes = blob.download_as_string()
         return base64.b64encode(img_bytes).decode()

@@ -1,4 +1,5 @@
 import json
+
 from backend.Types import Themes
 from backend.Types.Inventory import Inventory
 from backend.Types.Shop import Shop
@@ -18,10 +19,203 @@ def remove_init_num(input_string: str) -> str:
         return input_string
 
 
+class Goal:
+    """
+    Class to store a goal of a player.
+    Handles the title, description, status, and completion status of the goal.
+    """
+    def __init__(self, title: str, goal: str, xp_reward: int, gold_reward: int, status: str = "Active"):
+        """
+        Initializes the Goal object with the provided title, description, and status.
+        """
+        self.title = title
+        self.goal = goal
+        self.xp_reward = xp_reward
+        self.gold_reward = gold_reward
+        self.status = status
+
+    def complete(self):
+        """
+        Completes the goal.
+        """
+        self.status = "Completed"
+
+    def fail(self):
+        """
+        Fails the goal.
+        """
+        self.status = "Failed"
+
+    def to_dict(self) -> dict:
+        """
+        Converts the Goal object to a dictionary.
+
+        :return: the dictionary representation of the Goal object
+        """
+        return {
+            "title": self.title,
+            "description": self.goal,
+            "status": self.status,
+            "xp_reward": self.xp_reward,
+            "gold_reward": self.gold_reward
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> 'Goal':
+        """
+        Converts a dictionary to a Goal object.
+
+        :param data: the dictionary to convert
+        :return: the Goal object created from the dictionary
+        """
+        if "status" not in data:
+            data["status"] = "Active"
+        if "gold_reward" not in data:
+            data["gold_reward"] = 0
+        if "goal" not in data:
+            data["goal"] = data["description"]
+        return Goal(data["title"], data["goal"], data["xp_reward"], data["gold_reward"], data["status"])
+
+    def __str__(self):
+        return str(self.to_dict())
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __dict__(self):
+        return self.to_dict()
+
+    def toJSON(self):
+        return json.dumps(self.to_dict(), indent=4)
+
+    def __hash__(self):
+        return hash(self.to_dict())
+
+    def __eq__(self, other):
+        return self.to_dict() == other.to_dict()
+
+    def __ne__(self, other):
+        return self.to_dict() != other.to_dict()
+
+    def is_active(self):
+        return self.status == "Active"
+
+
+class Quest:
+    """
+    Class to store a quest of a player.
+    Handles the title, description, status, and completion status of the quest.
+    """
+    def __init__(self, title: str, quest: str, xp_reward: int, gold_reward: int, goals: dict[str, Goal], status: str = "Active"):
+        """
+        Initializes the Quest object with the provided title, description, and status.
+        """
+        self.title = title
+        self.quest = quest
+        self.xp_reward = xp_reward
+        self.gold_reward = gold_reward
+        self.status = status
+        self.goals = goals
+
+    def complete(self):
+        """
+        Completes the quest.
+        """
+        self.status = "Completed"
+
+    def fail(self):
+        """
+        Fails the quest.
+        """
+        self.status = "Failed"
+
+    def to_dict(self) -> dict:
+        """
+        Converts the Quest object to a dictionary.
+
+        :return: the dictionary representation of the Quest object
+        """
+        return {
+            "quest_title": self.title,
+            "quest_description": self.quest,
+            "status": self.status,
+            "quest_xp_reward": self.xp_reward,
+            "quest_gold_reward": self.gold_reward,
+            "goals": {goal: self.goals[goal].to_dict() for goal in self.goals.keys()}
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> 'Quest':
+        """
+        Converts a dictionary to a Quest object.
+
+        :param data: the dictionary to convert
+        :return: the Quest object created from the dictionary
+        """
+        if isinstance(data["goals"], list):
+            goals = {goal["title"]: Goal.from_dict(goal) for goal in data["goals"]}
+        else:
+            goals = {goal: Goal.from_dict(data["goals"][goal]) for goal in data["goals"].keys()}
+        if "status" not in data:
+            data["status"] = "Active"
+        if "quest_gold_reward" not in data:
+            data["quest_gold_reward"] = 0
+        return Quest(data["quest_title"], data["quest_description"], data["quest_xp_reward"], data["quest_gold_reward"], goals, data["status"])
+
+    def generate_dict_for_action(self) -> dict:
+        """
+        Generates a dictionary for the action based on the quest.
+
+        :return: the dictionary for the action
+        """
+        return {
+            "quest_title": self.title,
+            "quest_description": self.quest,
+            "goals": self.get_active_goals_list()
+        }
+
+    def __str__(self):
+        return str(self.to_dict())
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __dict__(self):
+        return self.to_dict()
+
+    def toJSON(self):
+        return json.dumps(self.to_dict(), indent=4)
+
+    def __hash__(self):
+        return hash(self.to_dict())
+
+    def __eq__(self, other):
+        return self.to_dict() == other.to_dict()
+
+    def __ne__(self, other):
+        return self.to_dict() != other.to_dict()
+
+    def is_active(self):
+        return self.status == "Active"
+
+    def get_active_goals_list(self):
+        """
+        Returns a list of active goals.
+
+        :return: a list of active goals
+        """
+        temp_goals = [goal.to_dict() for goal in self.goals.values() if goal.is_active()]
+        for goal in temp_goals:
+            del goal["status"]
+            del goal["xp_reward"]
+            del goal["gold_reward"]
+        return temp_goals
+
+
 class SaveData:
     """
     Class to store the save data of a player.
-    Handles the story, shop, goals, memories, theme, background, level, experience points, action points, skills,
+    Handles the story, shop, goals, theme, background, level, experience points, action points, skills,
     inventory, coins, and death status of the player.
     Also, handles all the operations related to the save data.
     """
@@ -41,20 +235,19 @@ class SaveData:
             generated_theme = Themes.get_theme(theme)
 
             # generate the data's inventory
-            if not inventory:
-                generated_inventory = generated_theme.generate_empty_inventory(background)
-            elif isinstance(inventory, dict):
-                generated_inventory = Inventory(inventory)
-            elif isinstance(inventory, Inventory):
-                generated_inventory = inventory
-            else:
-                raise ValueError("Inventory must be a dictionary or an Inventory object.")
+            generated_inventory = generated_theme.generate_empty_inventory(background)
+            if inventory is not None:
+                if isinstance(inventory, dict):
+                    generated_inventory.merge_with(Inventory(inventory))
+                elif isinstance(inventory, Inventory):
+                    generated_inventory.merge_with(inventory)
+                else:
+                    raise ValueError("Inventory must be a dictionary or an Inventory object.")
 
             # initialize the SaveData object with the generated data
             self.story = {}
             self.shop = Shop()
-            self.goals = []
-            self.memories = []
+            self.quest = None
             self.theme = generated_theme
             self.background = background
             self.level = 1
@@ -75,8 +268,7 @@ class SaveData:
         """
         self.story = data["story"]
         self.shop = Shop(data["shop"])
-        self.goals = data["goals"]
-        self.memories = data["memories"]
+        self.quest = Quest.from_dict(data["quest"]) if data["quest"] else None
         self.theme = Themes.get_theme(data["theme"]) if isinstance(data["theme"], str) else data["theme"]
         self.background = data["background"]
         self.level = data["level"]
@@ -98,8 +290,7 @@ class SaveData:
         return {
             "story": self.story,
             "shop": self.shop.to_dict(),
-            "goals": self.goals,
-            "memories": self.memories,
+            "quest": self.quest.to_dict() if self.quest else None,
             "theme": str(self.theme),
             "background": self.background,
             "level": self.level,
@@ -149,13 +340,11 @@ class SaveData:
         """
         self.ver += 1
 
-    def init_story(self, goal: dict = None):
+    def init_story(self):
         """
         Initializes the story of the player.
         Includes setting the history, scene, prompt, image, status, goal, health, options, rates, advantages, levels,
         and experience points.
-
-        :param goal: the goal to be set for the player - Optional
         """
         skills = list(self.skills.keys())
         self.story = {
@@ -164,7 +353,6 @@ class SaveData:
             "prompt": "",
             "img": "",
             "status": "",
-            "goal": goal["goal"] if goal else "",
             "health": 5,
             "options": ["Wake up", "Look around", "Stand up"],
             "rates": [1, 1, 1],
@@ -172,12 +360,7 @@ class SaveData:
             "levels": [0, 0, 0],
             "experience": [0, 0, 0]
         }
-        if goal:
-            self.story["goal_status"] = "in progress"
-            self.story["gold_reward"] = goal["gold_reward"]
-            self.story["xp_reward"] = goal["xp_reward"]
         self.shop.close()
-        self.goals = []
 
     def update_story(self, result: dict, action: str):
         """
@@ -194,7 +377,7 @@ class SaveData:
         self.coins = result["coins"]
         self.story["scene"] = result["scene"]
         self.story["prompt"] = result["prompt"]
-        if "options" in result:
+        if "options" in result and result["health"] > 0:
             self.story["options"] = [remove_init_num(option) for option in result["options"] if option != ""]
             self.story["rates"] = result["rates"]
             self.story["advantages"] = [skill if skill in list(self.skills.keys()) else list(self.skills.keys())[0] for skill in result["advantages"]]
@@ -202,13 +385,12 @@ class SaveData:
             self.story["experience"] = result["experience"]
         else:
             self.story["options"] = []
-        if self.story["goal"]:
-            self.story["goal_status"] = result["goal_status"]
         if "new_location" in result:
             self.background["location"] = result["new_location"]
         self.add_xp(result_xp)
         self.story["status"] = result["action_result"]
         self.shop.close()
+        self.update_quest(result["quest"])
 
     def add_xp(self, xp: int):
         """
@@ -227,10 +409,70 @@ class SaveData:
 
         self.xp = current_xp
 
-    def goals_list(self) -> list[str]:
+    def set_quest(self, quest: dict):
         """
-        Returns the list of goals of the player.
+        Sets the quest of the player based on the provided quest.
+        The quest must be in the following format:
+        {
+            "title": "Quest Title",
+            "quest": "Quest Description",
+            "xp_reward": 100,
+            "gold_reward": 50,
+            "goals": {
+                "goal1": {
+                    "title": "Goal Title",
+                    "goal": "Goal Description",
+                    "xp_reward": 50,
+                    "gold_reward": 25
+                },
+                "goal2": {
+                    "title": "Goal Title",
+                    "goal": "Goal Description",
+                    "xp_reward": 50,
+                    "gold_reward": 25
+                }
+            }
+        }
 
-        :return: the list of goals of the player
+        :param quest: the quest to be set
         """
-        return [goal["goal"] for goal in self.goals]
+        self.quest = Quest.from_dict(quest)
+
+    def update_quest(self, updater_output: dict):
+        """
+        Updates the player's goals based on the updater's output.
+        The updater result must be in the following format:
+        {
+            "completed": [goalTitle1, goalTitle2, ...],
+            "failed": [goalTitle1, goalTitle2, ...],
+            "new": [goal3, goal4, ...]
+        }
+
+        :param updater_output: The result of the updater.
+        """
+        if "quest_completed" in updater_output:
+            if updater_output["quest_completed"] == 'completed':
+                self.quest.complete()
+                self.add_xp(self.quest.xp_reward)
+                self.coins += self.quest.gold_reward
+                self.background["backstory"] = updater_output["new_backstory"]
+            else:
+                self.quest.fail()
+            return
+
+        for goal in updater_output["completed"]:
+            if goal not in self.quest.goals:
+                continue
+            self.quest.goals[goal].complete()
+            self.add_xp(self.quest.goals[goal].xp_reward)
+            self.coins += self.quest.goals[goal].gold_reward
+        for goal in updater_output["failed"]:
+            if goal not in self.quest.goals:
+                continue
+            self.quest.goals[goal].fail()
+        for goal in updater_output["new"]:
+            if goal["title"] in self.quest.goals:
+                continue
+            if "gold_reward" not in goal:
+                goal["gold_reward"] = 0
+            self.quest.goals[goal["title"]] = Goal(goal["title"], goal["goal"], goal["xp_reward"], goal["gold_reward"])

@@ -1,0 +1,85 @@
+.QuestsPage {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    width: 100%;
+}
+
+.QuestsPageTitle {
+    font-size: 5vmin;
+    color: aliceblue;
+    margin-top: 2vmin;
+}
+
+.QuestsPageSubTitle {
+    font-size: 3vmin;
+    color: aliceblue;
+    margin-top: 1vmin;
+}
+
+.QuestContainer {
+    margin-top: 2vmin;
+    font-size: 3.5vmin;
+    border-top: 1px solid aliceblue;
+    border-bottom: 1px solid aliceblue;
+    padding: 1vmin 0;
+}
+
+.QuestDescription {
+    font-size: 2vmin;
+    color: rgba(240, 248, 255, 0.77);
+    margin-top: 1vmin;
+}
+
+.QuestRewards {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    margin-top: 1vmin;
+    font-size: 1.5vmin;
+}
+
+.GoalContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 80%;
+    margin-top: 1vmin;
+}
+
+.GoalTitle {
+    cursor: pointer;
+}
+
+.GoalTitleStrike {
+    text-decoration: line-through;
+    color: rgba(240, 248, 255, 0.38);
+}
+
+.GoalVisibilityIcon {
+    font-size: 1.5vmin;
+    margin-left: 1vmin;
+}
+
+.GoalDetailsContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-top: 1vmin;
+
+    font-size: 1.5vmin;
+}
+
+.XpReward {
+    color: rgba(77, 155, 220, 0.77);
+}
+
+.GoldReward {
+    color: goldenrod;
+    margin-left: 1vmin;
+}

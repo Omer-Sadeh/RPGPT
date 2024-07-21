@@ -52,7 +52,7 @@ class LocalConn(Connection):
         return self.saves_path + "/" + str(username) + "_cache.json"
 
     def get_image_path(self, username: str, save_name: str, category: str) -> str:
-        return self.saves_path + "/" + str(username) + "_" + save_name + "_" + category + ".png"
+        return self.saves_path + "/" + str(username) + "_" + save_name + "_" + category + ".jpg"
 
     def validate_user_file(self, username: str) -> None:
         """
@@ -126,7 +126,7 @@ class LocalConn(Connection):
 
     def return_image_string(self, username: str, save_name: str, category: str) -> str:
         if not os.path.exists(self.get_image_path(username, save_name, category)):
-            with open(str(pathlib.Path(__file__).parent.resolve()) + "/default_" + category + ".png", "rb") as image_file:
+            with open(str(pathlib.Path(__file__).parent.resolve()) + "/default_" + category + ".jpg", "rb") as image_file:
                 return base64.b64encode(image_file.read()).decode()
         with open(self.get_image_path(username, save_name, category), "rb") as image_file:
             return base64.b64encode(image_file.read()).decode()

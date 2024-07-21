@@ -7,8 +7,8 @@ from backend.GenAI.LLM.models.ModelClass import Model
 
 
 def image_prompt(subject: str):
-    return f"the best prompt for an image generator to generate an image of {subject} in the following formula: \
-    An image of [adjective] [subject] in a [environment], [creative lighting style], detailed, realistic, trending on \
+    return f"the best prompt for an image generator to generate a pencil sketch of {subject} in the following formula: \
+    A pencil sketch of [adjectives] [subject] in a [environment], detailed, realistic, trending on \
     artstation, in style of [famous artist 1], [famous artist 2], [famous artist 3]."
 
 
@@ -57,6 +57,7 @@ class LLM:
             "history": self.write_history(data.story["history"]),
             "choice": action,
             "result": action_result,
+            "current_quest": data.quest.generate_dict_for_action(),
             "health": data.story["health"],
             "inventory": data.inventory,
             "coins": data.coins
@@ -64,7 +65,7 @@ class LLM:
         logging.debug(f"Action JSON: {action_json}")
 
         result = self.model.generate_json(self.storyteller_system(data), str(action_json))
-        if result["status"] == "success" and not isinstance(result["result"]["options"][0], str):
+        if result["status"] == "success" and "options" in result["result"] and len(result["result"]["options"]) > 0 and not isinstance(result["result"]["options"][0], str):
             logging.debug(f"BAD RESULT! Action result: {result['result']}")
             logging.debug(f"Trying again...")
             result = self.model.generate_json(self.storyteller_system(data), str(action_json))
@@ -85,24 +86,28 @@ class LLM:
         logging.debug(f"Action JSON: {action_json}")
         return self.model.generate_json(self.action_system(data), str(action_json))
 
-    def generate_custom_goal(self, data: SaveData, goal: str) -> dict:
-        goal_generator_input = {
-            "desired_goal": goal,
-            "inventory": data.inventory,
+    def generate_quest(self, data: SaveData) -> dict:
+        quest_generator_input = {
             "background": data.background,
-            "memories": data.memories
+            "history": self.write_history(data.story["history"]),
+            "current_scene": data.story["scene"],
+            "inventory": data.inventory
         }
-        logging.debug(f"Goal generator input: {goal_generator_input}")
-        return self.model.generate_json(self.goal_system(data.theme), str(goal_generator_input))
+        logging.debug(f"Quest generator input: {quest_generator_input}")
+        return self.model.generate_json(self.quest_system(data.theme), str(quest_generator_input))
 
-    def generate_goals(self, data: SaveData) -> dict:
-        goal_generator_input = {
-            "inventory": data.inventory,
+    def update_quest(self, data: SaveData, action: str, new_scene: str, inventory: dict) -> dict:
+        if data.quest is None:
+            return {"status": "error", "reason": "No active quest!"}
+        quest_updater_input = {
             "background": data.background,
-            "memories": data.memories
+            "history": self.write_history(data.story["history"] + ["(player action: " + action + ") "]),
+            "current_scene": new_scene,
+            "inventory": inventory,
+            "quest": data.quest.generate_dict_for_action()
         }
-        logging.debug(f"Goal generator input: {goal_generator_input}")
-        return self.model.generate_json(self.goals_system(data.theme), str(goal_generator_input))
+        logging.debug(f"Quest updater input: {quest_updater_input}")
+        return self.model.generate_json(self.quest_update_system(data.theme), str(quest_updater_input))
 
     def generate_shop(self, data: SaveData) -> dict:
         shop_generator_input = {
@@ -112,23 +117,6 @@ class LLM:
         logging.debug(f"Shop generator input: {shop_generator_input}")
         return self.model.generate_json(self.shop_system(data.theme, data.inventory.categories),
                                         str(shop_generator_input))
-
-    def check_abandon(self, data: SaveData) -> dict:
-        action_json = {
-            "history": self.write_history(data.story["history"]),
-            "current_scene": data.story["scene"]
-        }
-        logging.debug(f"Action JSON: {action_json}")
-        return self.model.generate_json(self.abandon_system(data.theme), str(action_json))
-
-    def close_adventure(self, data: SaveData) -> dict:
-        close_json = {
-            "background": data.background,
-            "inventory": data.inventory,
-            "story": self.write_history(data.story["history"])
-        }
-        logging.debug(f"Action JSON: {close_json}")
-        return self.model.generate_json(self.close_system(data.theme), str(close_json))
 
     # ---------------------------------------------- #
     # ------------ Prompt Constructors ------------- #
@@ -153,7 +141,9 @@ class LLM:
         starting_location: the name of the player's starting location, fitting the {theme} theme. \
         inventory: a dictionary of items the player initially equips based on his backstory, in the json format i gave \
         them in. Each item must be a single string. \
-        prompt: {image_prompt('''this character''')} Be sure to include the fact that the character's gender is {background['gender']}. \
+        character_prompt: {image_prompt('''this character''')} You must include in the prompt the fact that the character's \
+        gender is {background['gender']}. \
+        scene_prompt: {image_prompt('''the starting location''')} \
         \
         The backstory should be one or two short sentences describing the player's background. \
         It should be creative, unique, hinting a rich world setting, \
@@ -165,37 +155,23 @@ class LLM:
     def storyteller_system(self, data: SaveData):
         theme = data.theme
         background = data.background
-        goal = data.story["goal"]
         skills = list(data.skills.keys())
-
-        goal_desc = "with a clear goal and an ending"
-        goal_end = "end is reached"
-        goal_end_field = ""
-        goal_field = ""
-
-        if goal:
-            goal_desc = "slowly leading to the goal I provide"
-            goal_end = "goal is achieved, failed"
-            goal_end_field = "goal_status: 'win', 'lose' or 'in progress' according to the status towards the goal. "
-            goal_field = f"The player's goal is: {goal}"
-
-        if len(data["memories"]) > 0:
-            background["memories"] = data["memories"][-10:]
 
         return (f"You are the Game Master, narrating a text-based {theme} adventure game. \
         Guide the player through an exciting {theme} world filled with secrets to uncover, puzzles to solve, exciting \
         twists and challenges to beat, fitting the {theme} theme. \
-        Adapt the story to the player's choices and ensure they experience a thrilling and engaging adventure, \
-        {goal_desc}. \
+        Adapt the story to the player's choices and ensure they experience a thrilling and engaging adventure. \
         Make sure to keep the story's history so far in mind and provide a consistent and immersive experience. \
+        If the player has a quest and goals, make sure to include them in the story. \
+        If not, aim the story towards a new quest. \
         \
         Player's background: {background} \
-        {goal_field}\
         \
         I will provide you in json format the following: \
         A history of the story so far, \
         the player's choice of action, \
         weather the action was successful or not, \
+        the player's current quest and goals, \
         the player's current health (out of 5), \
         the player's current inventory (items), \
         and the player's current amount of coins. \
@@ -225,11 +201,10 @@ class LLM:
         IMPORTANT - Do not add items to the player's inventory unless he chose an option resulting in receiving an \
         item, or the player receives an item in the scene you provide! \
         coins: the updated player's amount of coins. \
-        {goal_end_field}\
         prompt: {image_prompt('''this scene''')} \
         Keep the prompt in the {theme} theme and coherent with the story so far, and don't include the player in it! \
         \
-        IMPORTANT: When the adventure's {goal_end} or the player's health reaches 0, do not include the options field! \
+        IMPORTANT: When the player's health reaches 0, do not include the options field! \
         \
         ") + self.model.sys_footer()
 
@@ -264,48 +239,82 @@ class LLM:
         \
         " + self.model.sys_footer()
 
-    def goal_system(self, theme: Theme):
-        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
-        Your current role is to check weather the player's desired adventure goal is valid and generate it's \
-        properties. \
-        A valid goal is a goal that is consistent with the player's backstory, inventory and the {theme} theme. \
-        Also, a valid goal must be clear and direct, so it's easy to tell if the player achieved it or not. \
+    def quest_system(self, theme: Theme):
+        return (f"You are the Game Master, narrating a text-based {theme} adventure game. \
+        Your current role is to generate a main quest for the player to achieve, with 3 sub-goals. \
+        The main quest should be long, challenging, and engaging, fitting the {theme} theme, and consistent with the \
+        player's backstory, inventory and the history so far (if any). \
         \
         I will provide you in json format the following: \
-        The player's desired goal, \
-        The player's current inventory (items), \
-        The player's background, \
-        The player's current milestones. \
+            The player's background, \
+            The player's history, \
+            The player's current scene, \
+            The player's current inventory (items). \
         \
         You will reply with a single json format containing the following fields: \
-        valid: a string value indicating weather the player's goal is valid or not: 'yes' or 'no'. \
-        If the goal is valid, provide the following fields: \
-        xp_reward: the amount of experience points the player will receive if he achieves the goal, in range [0, 1000].\
-        gold_reward: add this field only if the goal completion means the player receives coins from the goal \
-        requester, and set it to the amount of coins the player will receive, in range [0, 500]. \
+        quest_title: the main quest's title. \
+        quest_description: a short description of the main quest, being clear and direct, so it's easy to tell if the \
+        player achieved it or not, and consistent with the player's backstory, inventory and the {theme} theme. \
+        quest_xp_reward: the amount of experience points the player will receive if he achieves the main quest, in \
+        range [0, 1000]. \
+        quest_gold_reward: add this field only if the main quest completion means the player receives coins from the \
+        quest requester, and set it to the amount of coins the player will receive, in range [0, 5000]. \
+        goals: a list of 3 sub-goals in dict format, each containing the following fields: \
+            - title: the sub-goal's title. \
+            - goal: a short description of what the player needs to achieve, being clear and direct, so it's easy to \
+            tell if the player achieved them or not, and consistent with the player's backstory, inventory and the \
+            {theme} theme. \
+            - xp_reward: the amount of experience points the player will receive if he achieves the sub-goal, in range \
+            [0, 100]. \
+            - gold_reward: add this field only if the sub-goal completion means the player receives coins from the \
+            goal requester, and set it to the amount of coins the player will receive, in range [0, 250]. \
         \
-        " + self.model.sys_footer()
+        The main quest should build upon the world story and player's background. \
+        The sub-goals should be long-term goals, which the player will need to work on for a while, each building upon \
+        the previous one, and leading to the main quest. \
+        If the quest's or goals' text contains a ' character, escape it with a backslash. \
+        \
+        ") + self.model.sys_footer()
 
-    def goals_system(self, theme: Theme):
-        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
-        Your current role is to generate goals for the player to achieve. \
+    def quest_update_system(self, theme: Theme):
+        return (f"You are the Game Master, narrating a text-based {theme} adventure game. \
+        Your current role is to check weather the player's quest or goals are achieved and update the player's goals \
+        and quest. \
+        If you have a new goal to add to the player, add it according to the current scene, in the context of the \
+        player's backstory, history, inventory and other goals. \
+        Only add new goals if the current scene generates a new goal for the player to achieve in order to progress in \
+        the main quest. \
         \
-        I will provide you in json format details about the player's character, \
-        including his backstory, milestones and current inventory (items). \
+        I will provide you in json format the following: \
+            The player's background, \
+            The player's history, \
+            The player's current scene, \
+            The player's current inventory (items), \
+            The player's current quest and goals. \
         \
-        You will reply with a single python list format containing 5 different goals in dict format, each containing \
-        the following fields: \
-        title: the goal's title. \
-        goal: a short description of what the player needs to achieve, being clear and direct, so it's easy to tell if \
-        the player achieved them or not, and consistent with the player's backstory, inventory and the {theme} theme. \
-        xp_reward: the amount of experience points the player will receive if he achieves the goal, in range [0, 1000].\
-        gold_reward: add this field only if the goal completion means the player receives coins from the goal \
-        requester, and set it to the amount of coins the player will receive, in range [0, 500]. \
+        If the quest has completed or failed, reply with a single json format containing the following fields: \
+            quest_completed: a string value indicating weather the player's quest is completed or failed: 'completed' \
+            or 'failed'. \
+            new_backstory: an updated player's backstory according to the result of the quest (keep it short!). \
+        Else, you will reply with a single json format containing the following fields: \
+            completed: a list of the player's completed goals' titles. \
+            failed: a list of the player's failed goals' titles. \
+            new: a list of the player's new goals in dict format, each containing the following fields: \
+            - title: the goal's title. \
+            - goal: a short description of what the player needs to achieve, being clear and direct, so it's easy to tell if \
+            the player achieved them or not, and consistent with the player's backstory, inventory and the {theme} theme. \
+            - xp_reward: the amount of experience points the player will receive if he achieves the goal, in range [0, 100].\
+            - gold_reward: add this field only if the goal completion means the player receives coins from the goal \
+            requester, and set it to the amount of coins the player will receive, in range [0, 250]. \
         \
-        The goals should build upon the player's backstory and inventory, and enhance the world with the goal. \
+        Keep the new goals long-term goals, which the player will need to work on for a while. \
+        IMPORTANT: DO NOT add goals unless you have a good reason to do so! Not every scene presents a new goal! \
+        And no need to add several goals at once! \
+        the new goals should be decided according to the current scene, in the context of the player's backstory, \
+        history, inventory, other goals and most importantly, the main quest. \
         If the goal's text contains a ' character, escape it with a backslash. \
         \
-        " + self.model.sys_footer()
+        ") + self.model.sys_footer()
 
     def shop_system(self, theme: Theme, inv_categories: list[str]):
         return (f"You are the Game Master, narrating a text-based {theme} adventure game. \
@@ -336,36 +345,3 @@ class LLM:
         Note, That the shopkeeper knows the player's character well, and is a snarky person. \
         \
         ") + self.model.sys_footer()
-
-    def abandon_system(self, theme: Theme):
-        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
-        Your current role is to check weather the player can quit the current running adventure. \
-        \
-        I will provide you in json format the following: \
-            The current adventure history, \
-            The current scene the player is in. \
-        \
-        You will reply with a single json format containing the following single field: \
-            possible: a string value indicating weather the player's leaving is permitted or not: 'yes' or 'no'. \
-            The player is permitted to leave if there's no danger to the player, and if the current situation allows \
-            freedom of movement away. \
-        \
-        " + self.model.sys_footer()
-
-    def close_system(self, theme: Theme):
-        return f"You are the Game Master, narrating a text-based {theme} adventure game. \
-        Your current role is to summarize the adventure and close it. \
-        \
-        I will provide you in json format the following: \
-        The player's current background, \
-        The player's current inventory, \
-        and the full story. \
-        \
-        You will reply with a single json format containing the following fields: \
-        new_backstory: an updated player's backstory according to the result of the adventure (keep it short!). \
-        new_memories: an array of 2 of the player's central memories from the adventure, in the format: 'I defeated \
-        [character] at [place].', 'I found [item] in [place].', 'I saved [character] from [danger].', etc. \
-        IMPORTANT: a relevant memory is a major event, not every detail! \
-        IMPORTANT: keep the memories short and to the point! \
-        \
-        " + self.model.sys_footer()

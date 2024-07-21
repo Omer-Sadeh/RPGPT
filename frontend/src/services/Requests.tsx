@@ -1,3 +1,5 @@
+import {toast} from "react-toastify";
+
 const headers = {
     "Authorization": "Bearer TOKEN",
     "images": "True",
@@ -41,6 +43,15 @@ export async function req(endpoint: string, auth: string = '', params: any = {},
     });
 
     if (response.status === "error") {
+        toast.error("An error occurred! Please try again!", {
+            position: "top-center",
+            autoClose: 2000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: false,
+            theme: "dark",
+        });
         throw new Error(response.message);
     }
     return response.result;
